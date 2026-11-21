@@ -4,7 +4,7 @@ Automatiskt röktest för Flighty 64 (utan KickAssembler/VICE).
 
 1. Bygger src/main.asm med tools/ka_subset.py
 2. Kör spelet i tools/emu.py med en enkel "bot" som spelar:
-   meny -> springfas (4 vågor) -> rymdskepp -> flygfas (4 vågor)
+   meny (logo-effekten) -> springfas (4 vågor) -> rymdskepp -> flygfas (4 vågor)
    -> landning -> nivå 2 -> game over -> topplista
 3. Kontrollerar att inget kraschar, att alla faser och alla monstertyper
    dyker upp och att en bildruta aldrig tar mer CPU-tid än vad som finns.
@@ -89,6 +89,33 @@ def main():
     if shots:
         c.render(os.path.join(shots, 'menu.png'))
 
+    # startskärmens logo: blå/gul flagga i logons rasterlinjer, svart utanför
+    bars = set()
+    sprite_x = set()
+    gif = []
+    for f in range(128):
+        c.run_frame()
+        d021 = [c.line_regs[line][4] & 15 for line in range(55, 87)]
+        assert d021[:4] == [0] * 4 and d021[-4:] == [0] * 4, "färgbyte utanför logon: %s" % d021
+        inside = d021[4:28]
+        assert set(inside) == {6, 7}, "logon ska ha blå och gul: %s" % inside
+        assert inside.count(7) == 5, "vågräta balken ska vara 5 rader"
+        bars.add(inside.index(7))
+        sprite_x.add(c.io[0] | ((c.io[0x10] & 1) << 8))
+        if shots and f % 2 == 0:
+            from PIL import Image
+            c.render(os.path.join(shots, '.frame.png'), scale=1)
+            gif.append(Image.open(os.path.join(shots, '.frame.png')).crop((32, 24, 352, 104)).convert('P'))
+    assert c.io[0x1b] & 1 and c.io[0x17] & 1, "flaggbalken ska vara höjdförstorad och bakom texten"
+    assert min(bars) == 0 and max(bars) == 19, "balken studsar inte hela vägen: %s" % sorted(bars)
+    assert max(sprite_x) - min(sprite_x) > 200, "lodräta balken rör sig inte i sidled"
+    print("logo: vågrät balk rad %d-%d, lodrät balk x %d-%d" % (min(bars), max(bars), min(sprite_x), max(sprite_x)))
+    if shots:
+        os.remove(os.path.join(shots, '.frame.png'))
+        gif = [im.resize((640, 160)) for im in gif]
+        gif[0].save(os.path.join(shots, 'logo.gif'), save_all=True, append_images=gif[1:],
+                    duration=40, loop=0)
+
     # starta
     c.joy = 16
     c.run_frame()
@@ -96,6 +123,8 @@ def main():
     for _ in range(3):
         c.run_frame()
     assert peek(c, 'gameState') == 1, "spelet startade inte"
+    assert c.io[0x1b] == 0 and c.io[0x17] == 0 and c.io[0x1c] == 0xff, "spritelägen inte återställda"
+    assert peek(c, 'logoOn') == 0, "logons raster körs fortfarande"
     c.frame_busy.clear()
 
     seen = set()

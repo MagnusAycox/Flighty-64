@@ -11,6 +11,8 @@ står ett rymdskepp och väntar på marken. Spring in i det, så flyger du vidar
 genom en slingrande grotta där monstren både springer på marken och flyger i
 luften. Efter flygturen landar skeppet och nästa nivå börjar, med fler monster.
 
+![Startskärmens logo](docs/logo.gif)
+
 ![Huvudmenyn](docs/menu.png)
 ![Springfasen](docs/run.png)
 ![Flygfasen](docs/fly.png)
@@ -26,6 +28,12 @@ VICE ser texten ut som vanligt.)*
 Använd en joystick i **port 2**.
 
 ### Huvudmenyn
+
+Överst står **SOFTWARE OF SWEDEN** i stora bokstäver. Texten svänger mjukt fram
+och tillbaka i sidled, och genom bokstäverna syns en svensk flagga som
+studsar: det gula korsets vågräta balk studsar upp och ner som en boll
+(skarp vändning i nederkant, mjuk i överkant), och den lodräta balken glider
+höger–vänster.
 
 Menyn visar de **10 bästa resultaten** (namn och poäng). Det senast
 inskrivna resultatet visas i gult. Starta en omgång med **FIRE**.
@@ -173,6 +181,7 @@ src/
   enemies.asm     Monster, skott, kollisioner, sprite-uppbyggnad
   sound.asm       Ljudeffekter via SID
   menu.asm        Huvudmeny med topplista, "GAME OVER"
+  logo.asm        Startskärmens logo med studsande svensk flagga
   highscore.asm   Topplistan och namninmatning
   gfx_const.asm   (genererad) spritepekare, teckenkoder, kollisionsboxar
   gfx_data.asm    (genererad) tecken- och spritedata
@@ -208,7 +217,8 @@ räknas ut automatiskt från bilderna.
 | `$4400-$47ff` | Skärm B                                                    |
 | `$4800-$4fff` | Teckenset (tecken 0-63 kopieras från ROM, 64+ är grottan)  |
 | `$5000-$57ff` | Sprites (kopieras hit vid start)                           |
-| `$c000-$c1ff` | Ringbuffert för grottan, monster, skott, ljud (körtid)     |
+| `$4c00-$4de7` | Logotecknen (teckenkod 128-188, byggs vid start)           |
+| `$c000-$c1ff` | Ringbuffert för grottan, monster, skott, ljud, logons färger (körtid) |
 
 Grafiken ligger i VIC-bank 1 (`$dd00`). Programfilen blir då sammanhängande
 utan tomrum, och koden har plats ända upp till `$3fff`. BASIC- och KERNAL-ROM
@@ -233,6 +243,29 @@ avbrottsvektorer på `$fffa-$ffff`.
   multicolor. Huvudloopen får signalen att en ny bildruta börjar.
 * **Linje 63** (i den tomma rad 1): byt till rätt skärmbuffert och sätt
   grottans finscroll. HUD:en står därför still medan grottan scrollar.
+* På startskärmen ligger det övre avbrottet på **linje 55** i stället och kör
+  logons rasterloop (se nedan).
+
+### Startskärmens logo
+
+* **Bokstäverna** byggs när programmet startar, från C64:ans egna ROM-tecken.
+  Varje pixel blir 2×3 pixlar, så en bokstav blir 16×24 pixlar (2×3 tecken).
+  Tecknen är **inverterade**: förgrunden är svart runt bokstaven, och själva
+  bokstaven är ett hål där bakgrundsfärgen `$d021` syns.
+* **Svängningen i sidled** görs med finscroll (`$d016`) plus förskjutning i
+  hela tecken. Logoraderna visas i 38-kolumnsläge, så kanten som avslöjas
+  när texten flyttas döljs.
+* **Den vågräta gula balken:** raster-avbrottet på linje 55 kör en loop över
+  logons 24 rasterlinjer. Den skriver `$d021` (blått eller gult) i början av
+  varje linje, i vänsterkanten innan bilden ritas. Vilka linjer som är gula
+  läses ur `bounceTab`, som är en halv sinus (1 − |sin|): skarp vändning i
+  nederkant, mjuk i överkant.
+* **Den lodräta gula balken** är sprite 0, höjdförstorad och placerad
+  *bakom* förgrunden (`$d01b`). Den syns därför bara genom bokstavshålen.
+  Dess x-position följer en vanlig sinus (`flagXTab`), så den vänder mjukt
+  i båda ändarna.
+* Höjd- och sidledsrörelsen har olika hastighet, så flaggan rör sig som en
+  boll som studsar runt.
 
 ### Grottgeneratorn
 
@@ -267,7 +300,7 @@ bildruta, så varje omgång blir olika beroende på när man trycker fire.
 
 | Sprite | Användning                     |
 |--------|--------------------------------|
-| 0      | Gubben / rymdskeppet           |
+| 0      | Gubben / rymdskeppet (startskärmen: flaggans lodräta balk) |
 | 1-2    | Spelarens skott                |
 | 3-7    | Monster (max 5), rymdskeppet på marken, explosioner |
 

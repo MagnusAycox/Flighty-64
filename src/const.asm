@@ -39,6 +39,7 @@
 // Raster-IRQ
 .const IRQ_LINE_BOTTOM = 251
 .const IRQ_LINE_TOP    = 63
+.const IRQ_LINE_LOGO   = 55       // startskärmen: före logon på rad 1-3
 
 // Spel-tillstånd
 .const ST_MENU     = 0
@@ -234,6 +235,15 @@
 .const memSrc      = $8a          // 2 byte
 .const memDst      = $8c          // 2 byte
 .const memLen      = $8e          // 2 byte
+.const irqTopLine  = $90          // rasterlinje för det övre avbrottet
+.const logoOn      = $91          // 1 = startskärmens logo-raster körs
+.const logoD016    = $92          // $d016 för logoraderna
+.const logoOff     = $93          // logons förskjutning 0-31 px
+.const logoCoarse  = $94          // ... i hela tecken (0-3)
+.const swayPhase   = $95
+.const flagPhase   = $96
+.const bouncePhase = $97
+.const LOGO_LINES  = $c180        // 25 byte: $d021 per rasterlinje i logon
 .const sprX        = $68          // 8 byte
 .const sprY        = $70          // 8 byte
 .const sprPtr      = $78          // 8 byte

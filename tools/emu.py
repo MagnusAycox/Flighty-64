@@ -80,6 +80,8 @@ class C64:
         self.mpu.sp = 0xff
         self.mpu.p |= self.mpu.INTERRUPT
         self.wait_pc = syms['labels']['waitLoop']
+        self._snap_pending = False
+        self._badline = False
         self.frame_busy = []  # cykler från waitFrame-retur till nästa waitLoop
         self._busy_start = None
 
@@ -190,18 +192,34 @@ class C64:
                 self.advance(mpu.processorCycles - before)
         self.frame += 1
 
+    # Registren för en rasterlinje läses av vid cykel 16, ungefär där
+    # bilden börjar. Skrivningar i vänsterkanten gäller alltså samma linje.
+    SNAP_CYCLE = 16
+
     def advance(self, c):
         self.cycles += c
         new_line = (self.cycles // CYCLES_PER_LINE) % LINES
         while self.line != new_line:
+            if self._snap_pending:
+                self.snapshot_line()
             self.line = (self.line + 1) % LINES
-            self.snapshot_line()
-            # badline: CPU stoppas 40 cykler
+            self._snap_pending = True
+            # badline: CPU:n stoppas ca 40 cykler från cykel 14
             yscroll = self.io[0x11] & 7
-            if (self.io[0x11] & 0x10) and 0x30 <= self.line <= 0xf7 and (self.line & 7) == yscroll:
-                self.cycles += 40
+            self._badline = bool((self.io[0x11] & 0x10) and 0x30 <= self.line <= 0xf7
+                                 and (self.line & 7) == yscroll)
             if self.line == self.raster_cmp:
                 self.irq_latch |= 1
+            new_line = (self.cycles // CYCLES_PER_LINE) % LINES
+        if self._badline and self.cycles % CYCLES_PER_LINE >= 14:
+            self._badline = False
+            if self._snap_pending:
+                self.snapshot_line()
+                self._snap_pending = False
+            self.cycles += 40
+        if self._snap_pending and self.cycles % CYCLES_PER_LINE >= self.SNAP_CYCLE:
+            self.snapshot_line()
+            self._snap_pending = False
 
     # --- rendering
     def render(self, path, scale=2):
@@ -241,6 +259,7 @@ class C64:
             bg = PALETTE[d021 & 15]
             for x in range(x0, x1):
                 px[x, y] = bg
+            fg = set()             # förgrundspixlar (för sprite-prioritet)
             for sx in range(320):
                 X = sx + xscroll
                 if X >= 320:
@@ -262,9 +281,12 @@ class C64:
                     c = [d021, d022, d023, color & 7][pair]
                     if pair:
                         px[ix, y] = PALETTE[c & 15]
+                    if pair >= 2:
+                        fg.add(ix)
                 else:
                     if bits & (0x80 >> cx):
                         px[ix, y] = PALETTE[color]
+                        fg.add(ix)
             # sprites
             en = self.io[0x15]
             for n in range(7, -1, -1):
@@ -272,15 +294,21 @@ class C64:
                     continue
                 sy = self.io[1 + n * 2]
                 dy = line - sy
-                if not (0 <= dy < 21):
+                yexp = self.io[0x17] & (1 << n)
+                if yexp:
+                    dy >>= 1
+                if not (0 <= dy < 21) or line < sy:
                     continue
+                behind = self.io[0x1b] & (1 << n)
+                xexp = 2 if self.io[0x1d] & (1 << n) else 1
                 sxp = self.io[n * 2] | (0x100 if self.io[0x10] & (1 << n) else 0)
                 ptr = self.ram[screen + 0x3f8 + n]
                 base = bank + ptr * 64 + dy * 3
                 b = (self.ram[base] << 16) | (self.ram[base + 1] << 8) | self.ram[base + 2]
                 colr = self.io[0x27 + n] & 15
                 smc = self.io[0x1c] & (1 << n)
-                for i in range(24):
+                for k in range(24 * xexp):
+                    i = k // xexp
                     if smc:
                         pair = (b >> (22 - (i & ~1))) & 3
                         if not pair:
@@ -290,8 +318,8 @@ class C64:
                         if not (b >> (23 - i)) & 1:
                             continue
                         c = colr
-                    ix = sxp - 24 + 32 + i
-                    if x0 <= ix < x1:
+                    ix = sxp - 24 + 32 + k
+                    if x0 <= ix < x1 and not (behind and ix in fg):
                         px[ix, y] = PALETTE[c & 15]
         if scale != 1:
             img = img.resize((W * scale, H * scale), Image.NEAREST)

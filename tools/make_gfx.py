@@ -30,6 +30,12 @@ VIC_BANK = 0x4000
 SPRITE_BASE_ADDR = 0x5000     # spritedata kopieras hit vid start
 FIRST_CHAR = 64               # egna tecken: 64 och uppåt
 
+LOGO_WIDTH = 272              # "SOFTWARE OF SWEDEN": 16 bokstäver x 16 px + 2 mellanslag x 8 px
+LOGO_SWAY = 31                # svängning 0-31 pixlar (38-kolumnsfönstret är 304 px)
+FLAG_BAR_W = 6
+FLAG_X_MAX = (LOGO_WIDTH - FLAG_BAR_W) // 2   # tabellen lagrar x/2
+BOUNCE = 19                   # 24 rader hög logo - 5 rader balk
+
 SPR_MAP = {'.': 0, 'w': 1, 'b': 2, 's': 3}
 CHR_MAP = {'.': 0, 'r': 1, 'd': 2, 'g': 3}
 
@@ -303,6 +309,10 @@ SPRITES = [
     ]),
 ]
 
+# Flaggans lodräta gula balk på startskärmen. Hires-sprite: 'sss' = 6 pixlar.
+# Bara 12 rader data; med höjdförstoring blir den exakt 24 rader hög.
+SPRITES.append(("FLAGBAR", "top", ["sss........."] * 12))
+
 # Spegelvända gubbar (springer åt vänster)
 _by_name = {n: (a, r) for n, a, r in SPRITES}
 _mirrored = [(n.replace("RUN", "RUNL").replace("JUMP", "JUMPL"), a, [row[::-1] for row in r])
@@ -521,6 +531,22 @@ def main():
     data.append("sineTab:")
     sine = [int(round(20 + 20 * math.sin(2 * math.pi * i / 64))) for i in range(64)]
     data += fmt_bytes(sine, 16)
+    data.append("")
+
+    # Tabeller för startskärmens logo (256 steg per period)
+    data.append("// Logons svängning i sidled: 0-%d pixlar (hel sinusperiod)" % LOGO_SWAY)
+    data.append("swayTab:")
+    data += fmt_bytes([int(round(LOGO_SWAY / 2 * (1 + math.sin(2 * math.pi * i / 256))))
+                       for i in range(256)], 16)
+    data.append("// Flaggans lodräta balk, x/2 inom texten (hel sinus: mjuka vändningar)")
+    data.append("flagXTab:")
+    data += fmt_bytes([int(round(FLAG_X_MAX / 2 * (1 + math.sin(2 * math.pi * i / 256 - math.pi / 2))))
+                       for i in range(256)], 16)
+    data.append("// Flaggans vågräta balk: översta raden 0-%d. Halv sinus (|sin|):" % BOUNCE)
+    data.append("// skarp vändning i nederkant, mjuk i överkant")
+    data.append("bounceTab:")
+    data += fmt_bytes([int(round(BOUNCE * (1 - math.sin(math.pi * i / 256))))
+                       for i in range(256)], 16)
     data.append("")
 
     with open(os.path.join(SRC, "gfx_const.asm"), "w") as f:

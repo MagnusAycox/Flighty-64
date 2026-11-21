@@ -4,27 +4,25 @@
 
 .encoding "screencode_upper"
 
-.const MENU_HS_ROW = 8
+.const MENU_HS_ROW = 9
 .const MENU_HS_COL = 12
 
 menuText:
-    .byte 1, 10, COL_YELLOW
+    // rad 1-3: logon "SOFTWARE OF SWEDEN" (logo.asm)
+    .byte 5, 10, COL_YELLOW
     .text "F L I G H T Y   6 4"
     .byte 0
-    .byte 3, 3, COL_LIGHT_BLUE
-    .text "RUN, JUMP AND FLY THROUGH THE CAVES"
-    .byte 0
-    .byte 6, 11, COL_WHITE
+    .byte 7, 11, COL_WHITE
     .text "TOP 10 HIGH SCORES"
     .byte 0
-    .byte 19, 10, COL_LIGHT_GREEN
+    .byte 20, 10, COL_LIGHT_GREEN
     .text "PRESS FIRE TO START"
     .byte 0
-    .byte 21, 3, COL_GREY
+    .byte 22, 3, COL_GREY
     .text "JOYSTICK PORT 2  UP=JUMP  FIRE=SHOOT"
     .byte 0
-    .byte 23, 7, COL_DARK_GREY
-    .text "RUN TO THE SPACESHIP AND FLY"
+    .byte 24, 2, COL_LIGHT_BLUE
+    .text "RUN, JUMP AND FLY THROUGH THE CAVES"
     .byte 0
     .byte $ff
 
@@ -61,10 +59,11 @@ showMenu:
     ldx #>menuText
     jsr printList
     jsr printHighscores
-    rts
+    jmp logoStart
 
 // Färgcykling på titeln och blinkande "PRESS FIRE"
 menuAnimate:
+    jsr logoUpdate
     inc menuTimer
     lda menuTimer
     and #3
@@ -82,7 +81,7 @@ menuAnimate:
     and #7
     tay
     lda titleColors,y
-    sta COLORRAM+1*40+10,x
+    sta COLORRAM+5*40+10,x
     inx
     cpx #19
     bne !loop-
@@ -96,7 +95,7 @@ menuAnimate:
 !set:
     ldx #18
 !loop:
-    sta COLORRAM+19*40+10,x
+    sta COLORRAM+20*40+10,x
     dex
     bpl !loop-
 !done:

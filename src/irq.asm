@@ -5,6 +5,8 @@
 //                                signalera ny bildruta till huvudloopen.
 //  Linje 63  (i den tomma rad 1): byt skärmbuffert och sätt finscroll
 //                                för grottan.
+//  Startskärmen: övre avbrottet ligger på linje 55 i stället och kör
+//  logons rasterloop (logo.asm).
 // ===================================================================
 
 irq:
@@ -22,7 +24,7 @@ irq:
     lda hudD016
     sta $d016
     inc frameFlag
-    lda #IRQ_LINE_TOP
+    lda irqTopLine
     sta $d012
     lda #1
     sta irqStage
@@ -34,7 +36,10 @@ irqTop:
     sta $d018
     lda nextD016
     sta $d016
-    lda #IRQ_LINE_BOTTOM
+    lda logoOn
+    beq !+
+    jsr logoRaster
+!:  lda #IRQ_LINE_BOTTOM
     sta $d012
     lda #0
     sta irqStage

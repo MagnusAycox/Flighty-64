@@ -22,6 +22,7 @@
 .const SPR_HOP1     = 82
 .const SPR_SEEK0    = 83
 .const SPR_SEEK1    = 84
+.const SPR_FLAGBAR  = 85
 
 .const CH_ROCK0    = 64
 .const CH_ROCK1    = 65
@@ -34,7 +35,7 @@
 .const CH_SPIKE    = 72
 
 .const GFX_CHARS_LEN   = 72
-.const GFX_SPRITES_LEN = 1344
+.const GFX_SPRITES_LEN = 1408
 
 // Kollisionsboxar i spritepixlar (inklusive), union av alla ramar
 .const BOX_RUN_L = 2

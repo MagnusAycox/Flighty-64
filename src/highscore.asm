@@ -116,6 +116,7 @@ hsInsert:
 .const NAME_COL = 17
 
 enterName:
+    jsr logoStop
     jsr hsInsert
     lda #0
     sta $d015

@@ -45,6 +45,7 @@ start:
     sta $dd00
 
     jsr copyCharRom
+    jsr buildLogoChars
     jsr copyGfx
     jsr initSid
     jsr initVic
@@ -63,6 +64,9 @@ start:
     sta frameFlag
     sta joy
     sta irqStage
+    sta logoOn
+    lda #IRQ_LINE_TOP
+    sta irqTopLine
 
     lda #D016_MENU
     sta hudD016
@@ -294,6 +298,7 @@ setFlyColors:
 // Starta en ny omgång
 // -------------------------------------------------------------------
 startGame:
+    jsr logoStop
     lda #0
     sta $d015
     sta sprEnable
@@ -406,6 +411,7 @@ startGame:
 #import "enemies.asm"
 #import "sound.asm"
 #import "menu.asm"
+#import "logo.asm"
 #import "highscore.asm"
 
 // Grafikdata (genererad av tools/make_gfx.py)
