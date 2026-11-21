@@ -4,9 +4,10 @@ Automatiskt röktest för Flighty 64 (utan KickAssembler/VICE).
 
 1. Bygger src/main.asm med tools/ka_subset.py
 2. Kör spelet i tools/emu.py med en enkel "bot" som spelar:
-   meny -> springfas -> rymdskepp -> flygfas -> game over -> topplista
-3. Kontrollerar att inget kraschar, att alla faser nås och att en
-   bildruta aldrig tar mer CPU-tid än vad som finns.
+   meny -> springfas (4 vågor) -> rymdskepp -> flygfas (4 vågor)
+   -> landning -> nivå 2 -> game over -> topplista
+3. Kontrollerar att inget kraschar, att alla faser och alla monstertyper
+   dyker upp och att en bildruta aldrig tar mer CPU-tid än vad som finns.
 
 Kör:  python3 tools/smoke_test.py [--shots katalog]
 """
@@ -99,27 +100,38 @@ def main():
 
     seen = set()
     taken = set()
-    for f in range(4000):
+    monsters = set()
+    for f in range(9000):
         c.joy = bot(c, f)
         c.ram[addr(c, 'lives')] = 3          # oändliga liv under testet
         c.run_frame()
         ph = peek(c, 'phase')
-        if ph not in seen:
-            print("bildruta %5d: fas %d" % (f, ph))
-            seen.add(ph)
-        # skärmbild när spelaren och minst ett monster syns
-        visible = c.io[0x15] & 1 and peek(c, 'pState') == 0 and any(
-            c.io[0x15] & (1 << n) and 60 < c.io[n * 2] + (256 if c.io[0x10] & (1 << n) else 0) < 300
-            for n in range(3, 8))
-        if shots and visible and ph == 0 and f > 500 and 'run' not in taken:
+        st = (peek(c, 'level'), ph, peek(c, 'wave'))
+        if st not in seen:
+            print("bildruta %5d: nivå %d, fas %d, våg %d" % ((f,) + st))
+            seen.add(st)
+        for i in range(5):
+            monsters.add(peek(c, 'M_TYPE', i))
+        # skärmbild när spelaren och ett av de nya monstren syns
+        def shown(types):
+            for n in range(3, 8):
+                x = c.io[n * 2] + (256 if c.io[0x10] & (1 << n) else 0)
+                if c.io[0x15] & (1 << n) and 80 < x < 300 and peek(c, 'M_TYPE', n - 3) in types:
+                    return True
+            return False
+        ok = shots and c.io[0x15] & 1 and peek(c, 'pState') == 0 and peek(c, 'waveCol') > 40
+        if ok and ph == 0 and 'run' not in taken and shown((5, 6)) and peek(c, 'B_ON', 0):
             c.render(os.path.join(shots, 'run.png'))
             taken.add('run')
-        if shots and visible and ph == 2 and f > 2600 and 'fly' not in taken:
+        if ok and ph == 2 and 'fly' not in taken and shown((7,)) and peek(c, 'B_ON', 0):
             c.render(os.path.join(shots, 'fly.png'))
             taken.add('fly')
-        if ph == 2 and f > 3200:
+        if peek(c, 'level') == 2 and peek(c, 'wave') == 1:
             break
-    assert seen == {0, 1, 2}, "alla faser nåddes inte: %s" % seen
+    phases = {p for _, p, _ in seen}
+    assert phases == {0, 1, 2, 3}, "alla faser nåddes inte: %s" % phases
+    assert peek(c, 'level') == 2, "nivå 2 nåddes inte"
+    assert {1, 2, 5, 6, 7} <= monsters, "alla monstertyper syntes inte: %s" % monsters
     busy = max(c.frame_busy[2:])
     print("mest CPU-tid i en bildruta: %d cykler (%.0f%%)" % (busy, 100.0 * busy / FRAME_CYCLES))
     assert busy < FRAME_CYCLES, "en bildruta tog för lång tid"

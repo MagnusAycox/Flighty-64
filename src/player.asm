@@ -21,10 +21,23 @@ playerUpdate:
     rts
 
 !alive:
-    jsr fireCheck
+    lda joy                 // åt vilket håll tittar gubben?
+    and #JOY_RIGHT
+    beq !+
+    lda #0
+    sta facing
+!:  lda joy
+    and #JOY_LEFT
+    beq !+
+    lda #1
+    sta facing
+!:  jsr fireCheck
     lda phase
     cmp #PH_FLY
-    bne playerRun
+    bcc playerRun           // PH_RUN / PH_LANDING
+    beq !fly+
+    jmp playerDock
+!fly:
     jmp playerFly
 
 // -------------------------------------------------------------------
@@ -242,6 +255,9 @@ playerFly:
 !:
     lda invuln
     bne !safe+
+    lda phase
+    cmp #PH_DOCK
+    beq !safe+
     lda px
     clc
     adc #S_LEFT
@@ -282,6 +298,17 @@ shipHitsWall:
 // -------------------------------------------------------------------
 // Skjuta
 // -------------------------------------------------------------------
+// Skottets riktning beror på vad man gör:
+//   springfasen, på marken:  rakt fram eller bakåt (dit gubben tittar)
+//   springfasen, i luften:   rakt upp, eller snett upp om man håller
+//                            höger/vänster
+//   flygfasen:               fram, snett upp (joystick upp) eller
+//                            snett ned (joystick ned)
+shotDX: .byte 6, 256-6, 0,     4, 256-4, 6,     4, 4
+shotDY: .byte 0, 0,     256-6, 256-4, 256-4, 0, 256-4, 4
+shotXO: .byte 16, 0,    8,     14, 2,     20,    18, 18
+shotYO: .byte 9, 9,     256-4, 0,  0,     8,     4,  11
+
 fireCheck:
     lda fireCool
     beq !+
@@ -290,6 +317,9 @@ fireCheck:
 !:  lda joy
     and #JOY_FIRE
     beq !done+
+    lda phase
+    cmp #PH_DOCK
+    beq !done+
     ldy #0
     lda B_ON
     beq !free+
@@ -297,30 +327,48 @@ fireCheck:
     lda B_ON+1
     bne !done+
 !free:
+    lda phase
+    cmp #PH_FLY
+    bne !run+
+    ldx #SHOT_FLY
+    lda joy
+    and #JOY_UP
+    beq !+
+    ldx #SHOT_FLYUP
+!:  lda joy
+    and #JOY_DOWN
+    beq !go+
+    ldx #SHOT_FLYDOWN
+    bne !go+
+!run:
+    ldx facing              // SHOT_RIGHT / SHOT_LEFT
+    lda onGround
+    bne !go+
+    ldx #SHOT_UP
+    lda joy
+    and #JOY_RIGHT
+    beq !+
+    ldx #SHOT_UPRIGHT
+!:  lda joy
+    and #JOY_LEFT
+    beq !go+
+    ldx #SHOT_UPLEFT
+!go:
     lda #1
     sta B_ON,y
     lda #10
     sta fireCool
-    lda phase
-    cmp #PH_FLY
-    beq !ship+
+    lda shotDX,x
+    sta B_DX,y
+    lda shotDY,x
+    sta B_DY,y
     lda py
     clc
-    adc #9
+    adc shotYO,x
     sta B_Y,y
     lda px
     clc
-    adc #16
-    jmp !snd+
-!ship:
-    lda py
-    clc
-    adc #8
-    sta B_Y,y
-    lda px
-    clc
-    adc #20
-!snd:
+    adc shotXO,x
     sta B_XLO,y
     lda #0
     adc #0
@@ -355,7 +403,7 @@ respawn:
     sta invuln
     lda phase
     cmp #PH_FLY
-    beq !fly+
+    bcs !fly+
 
     // hitta en kolumn med fast mark
     lda #56
@@ -418,8 +466,12 @@ boardShip:
 !:  sta px
     lda #PH_FLY
     sta phase
+    lda #0
+    sta wave
+    sta waveCol
     lda #60
     sta invuln
+    sta spawnTimer
     lda #0
     sta onGround
     sta vyLo
@@ -428,9 +480,92 @@ boardShip:
     jsr setFlyColors
     lda #CAVE_CR_FLY
     jsr setCaveColors
+    jsr setMaxMon
+    jsr showWaveMsg
     lda #$50
     jsr addScore
     lda #$50
     jsr addScore
     lda #SFX_PICKUP
     jmp playSfx
+
+// -------------------------------------------------------------------
+// Landning efter flygfasen. Först flyger man fritt (utan att kunna
+// krocka) medan marken planar ut, sedan landar autopiloten skeppet
+// och nästa nivå börjar.
+// -------------------------------------------------------------------
+.const DOCK_X = 60
+
+playerDock:
+    lda landDelay
+    beq !auto+
+    jmp playerFly
+!auto:
+    lda px
+    cmp #DOCK_X
+    beq !y+
+    bcc !right+
+    dec px
+    jmp !y+
+!right:
+    inc px
+!y:
+    lda px
+    clc
+    adc #12
+    sta cxLo
+    lda #0
+    sta cxHi
+    jsr colAt
+    lda RING_FLOORY,y
+    cmp #PIT_Y
+    beq !wait+
+    sec
+    sbc #S_BOT+1
+    sta tmp0
+    lda py
+    cmp tmp0
+    beq !down+
+    bcc !lower+
+    dec py
+    rts
+!lower:
+    inc py
+!wait:
+    rts
+!down:
+    lda px
+    cmp #DOCK_X
+    bne !wait-
+    // framme: kliv ur skeppet
+nextLevel:
+    lda level
+    cmp #99
+    bcs !+
+    inc level
+!:  lda #PH_RUN
+    sta phase
+    lda #0
+    sta wave
+    sta waveCol
+    sta facing
+    sta vyLo
+    sta vyHi
+    sta pyLo
+    lda #1
+    sta onGround
+    lda py
+    sec
+    sbc #P_H-S_BOT-1        // gubben står där skeppet stod
+    sta py
+    lda #60
+    sta invuln
+    sta spawnTimer
+    jsr setGenRun
+    jsr setRunColors
+    lda #CAVE_CR_RUN
+    jsr setCaveColors
+    jsr setMaxMon
+    lda #SFX_PICKUP
+    jsr playSfx
+    jmp showWaveMsg

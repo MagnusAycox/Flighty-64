@@ -107,7 +107,10 @@ genColumn:
 newSegment:
     lda phase
     cmp #PH_LANDING
+    beq !land+
+    cmp #PH_DOCK
     bne !+
+!land:
     jmp segLanding
 !:  cmp #PH_FLY
     bne !+
@@ -189,9 +192,9 @@ ceilUp:
 makePit:
     lda gPitCool
     bne !done+
-    lda distHi              // inga gropar i början
+    lda wave                // inga gropar i början av en nivå
     bne !ok+
-    lda distLo
+    lda waveCol
     cmp #40
     bcc !done+
 !ok:
@@ -247,10 +250,10 @@ segFly:
     clc
     adc #8
     sta tmp1                // öppning 8-11 rader
-    lda difficulty
-    cmp #8
+    lda level
+    cmp #3
     bcc !+
-    dec tmp1                // svårare: smalare
+    dec tmp1                // senare nivåer: smalare
 !:  lda #PLAY_ROWS
     sec
     sbc gCeilT
@@ -405,36 +408,54 @@ worldStep:
     sta pendingD016
     rts
 
-// En kolumn har passerat: poäng, svårighet och fasbyte
+// En kolumn har passerat: poäng, vågor och fasbyten
 columnPassed:
-    inc distLo
-    bne !+
-    inc distHi
-!:  lda #$01
+    lda #$01
     jsr addScore
     lda landDelay
     beq !+
     dec landDelay
-!:  lda distLo
-    and #63
-    bne !+
-    lda difficulty
-    cmp #12
-    bcs !+
-    inc difficulty
 !:  lda phase
     cmp #PH_RUN
+    beq !count+
+    cmp #PH_FLY
     bne !done+
-    lda distHi
-    cmp #>RUN_LEN
+!count:
+    inc waveCol
+    lda waveCol
+    cmp #WAVE_LEN
     bne !done+
-    lda distLo
-    cmp #<RUN_LEN
-    bne !done+
+    lda #0
+    sta waveCol
+    inc wave
+    lda wave
+    cmp #NUM_WAVES
+    beq !phaseEnd+
+    jsr setMaxMon           // ny våg: nya monster, fler monster
+    jmp showWaveMsg
+!phaseEnd:
+    lda #NUM_WAVES-1
+    sta wave
+    lda phase
+    cmp #PH_RUN
+    bne !dock+
     lda #PH_LANDING         // dags för rymdskeppet
     sta phase
     lda #8
     sta landDelay
+    lda #<msgShip
+    ldx #>msgShip
+    jmp showMsg
+!dock:
+    lda #PH_DOCK            // flygfasen klar: landa
+    sta phase
+    lda #48                 // marken hinner plana ut innan landningen
+    sta landDelay
+    lda #1
+    sta gSeg
+    lda #<msgDock
+    ldx #>msgDock
+    jmp showMsg
 !done:
     rts
 

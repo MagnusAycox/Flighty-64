@@ -132,21 +132,30 @@ setCaveColors:              // A = färg-RAM-värde för rad 2-24
 // HUD (rad 0)
 // -------------------------------------------------------------------
 .const HUD_SCORE = 7
-.const HUD_LIVES = 22
-.const HUD_HI    = 29
+.const HUD_LEVEL = 17
+.const HUD_WAVE  = 20
+.const HUD_LIVES = 28
+.const HUD_HI    = 33
 
+// SCORE 000000 LV 01-1 LIVES 3 HI 000000  (kolumn 1-38)
 hudText:
     .byte 0, 1, COL_LIGHT_BLUE
     .text "SCORE"
     .byte 0
-    .byte 0, 16, COL_LIGHT_BLUE
+    .byte 0, 14, COL_LIGHT_BLUE
+    .text "LV"
+    .byte 0
+    .byte 0, 22, COL_LIGHT_BLUE
     .text "LIVES"
     .byte 0
-    .byte 0, 26, COL_LIGHT_BLUE
+    .byte 0, 30, COL_LIGHT_BLUE
     .text "HI"
     .byte 0
     .byte 0, HUD_SCORE, COL_WHITE
     .text "000000"
+    .byte 0
+    .byte 0, HUD_LEVEL, COL_GREEN
+    .text "00-0"
     .byte 0
     .byte 0, HUD_LIVES, COL_WHITE
     .text "0"
@@ -156,12 +165,106 @@ hudText:
     .byte 0
     .byte $ff
 
+// Meddelanden som tillfälligt ersätter HUD-raden
+.const MSG_LEVEL = 17
+.const MSG_WAVE  = 26
+msgWave:
+    .byte 0, 11, COL_YELLOW
+    .text "LEVEL 00  WAVE 0"
+    .byte 0
+    .byte $ff
+msgShip:
+    .byte 0, 8, COL_YELLOW
+    .text "THE SPACESHIP IS NEAR!"
+    .byte 0
+    .byte $ff
+msgDock:
+    .byte 0, 12, COL_YELLOW
+    .text "PREPARE TO LAND"
+    .byte 0
+    .byte $ff
+
+// showMsg: visa blocklistan A/X på HUD-raden i ca 2,5 sekunder
+showMsg:
+    jsr clearHudRow
+    jsr printList
+    lda #125
+    sta hudMsgTimer
+    rts
+
+// "LEVEL nn  WAVE n"
+showWaveMsg:
+    lda #<msgWave
+    ldx #>msgWave
+    jsr showMsg
+    ldx #MSG_LEVEL
+    jsr putLevel
+    lda wave
+    clc
+    adc #$31
+    sta SCREEN_A+MSG_WAVE
+    sta SCREEN_B+MSG_WAVE
+    rts
+
+// putLevel: skriv nivån med två siffror på rad 0, kolumn X
+putLevel:
+    lda level
+    ldy #$30
+!loop:
+    cmp #10
+    bcc !done+
+    sbc #10
+    iny
+    jmp !loop-
+!done:
+    ora #$30
+    sta SCREEN_A+1,x
+    sta SCREEN_B+1,x
+    tya
+    sta SCREEN_A,x
+    sta SCREEN_B,x
+    rts
+
+// clearHudRow: töm rad 0 i båda buffertarna (bevarar A och X)
+clearHudRow:
+    pha
+    txa
+    pha
+    ldx #39
+    lda #32
+!loop:
+    sta SCREEN_A,x
+    sta SCREEN_B,x
+    dex
+    bpl !loop-
+    pla
+    tax
+    pla
+    rts
+
 drawHud:
+    jsr clearHudRow
     lda #<hudText
     ldx #>hudText
     jsr printList
     // fall igenom
 hudUpdate:
+    lda hudMsgTimer         // visas ett meddelande?
+    beq !normal+
+    dec hudMsgTimer
+    bne !rts+
+    jmp drawHud
+!rts:
+    rts
+!normal:
+    ldx #HUD_LEVEL
+    jsr putLevel
+    lda wave
+    clc
+    adc #$31
+    sta SCREEN_A+HUD_WAVE
+    sta SCREEN_B+HUD_WAVE
+
     ldx #0
     ldy #0
 !loop:

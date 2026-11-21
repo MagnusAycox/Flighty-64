@@ -2,26 +2,29 @@
 // Flighty 64 - konstanter, minneslayout och variabler
 // ===================================================================
 //
-// Minneskarta (VIC-bank 0, $0000-$3fff):
-//   $0400-$07ff  Skärm A (dubbelbuffring)
-//   $0801-$1fff  BASIC-start + programkod
-//   $2000-$27ff  Teckenset (tecken 0-63 kopieras från ROM, 64+ egna)
-//   $2800-$2bff  Skärm B (dubbelbuffring)
-//   $3000-$33ff  Sprites + tabeller
+// Minneskarta:
+//   $0801-$3fff  BASIC-start, programkod och grafikdata (källa)
+//   VIC-bank 1 ($4000-$7fff):
+//   $4000-$43ff  Skärm A (dubbelbuffring)
+//   $4400-$47ff  Skärm B (dubbelbuffring)
+//   $4800-$4fff  Teckenset (tecken 0-63 kopieras från ROM, 64+ egna)
+//   $5000-$57ff  Sprites (kopieras dit vid start)
 //   $c000-$c1ff  Variabler/tabeller som inte behöver laddas
 //
 // BASIC- och KERNAL-ROM slås av ($01 = $35), så hela zero page är vår.
 // ===================================================================
 
-.const SCREEN_A   = $0400
-.const SCREEN_B   = $2800
-.const CHARSET    = $2000
+.const VIC_BANK   = $4000
+.const SCREEN_A   = $4000
+.const SCREEN_B   = $4400
+.const CHARSET    = $4800
+.const SPRITES    = $5000
 .const COLORRAM   = $d800
-.const SCREEN_B_OFS_HI = $24      // >(SCREEN_B - SCREEN_A)
-.const COLOR_OFS_HI    = $d4      // >(COLORRAM - SCREEN_A)
+.const SCREEN_B_OFS_HI = $04      // >(SCREEN_B - SCREEN_A)
+.const COLOR_OFS_HI    = $98      // >(COLORRAM - SCREEN_A)
 
-.const D018_A     = $18           // skärm $0400, tecken $2000
-.const D018_B     = $a8           // skärm $2800, tecken $2000
+.const D018_A     = $02           // skärm +$0000, tecken +$0800 (i bank 1)
+.const D018_B     = $12           // skärm +$0400, tecken +$0800
 .const D016_MENU  = $08           // 40 kolumner, multicolor av (text i alla färger)
 .const D016_HUD   = $00           // 38 kolumner, multicolor av, ingen scroll
 .const D016_GAME  = $10           // 38 kolumner, multicolor på (+ finscroll)
@@ -46,8 +49,11 @@
 .const PH_RUN      = 0            // gubben springer
 .const PH_LANDING  = 1            // rymdskeppet väntar på marken
 .const PH_FLY      = 2            // vi flyger rymdskeppet
+.const PH_DOCK     = 3            // skeppet landar, nästa nivå börjar
 
-.const RUN_LEN     = 384          // antal kolumner innan rymdskeppet dyker upp
+// Varje fas består av 4 vågor med olika sorters monster
+.const WAVE_LEN    = 160          // kolumner per våg (ca 13 sekunder)
+.const NUM_WAVES   = 4
 
 // Joystick-bitar (efter eor #$ff)
 .const JOY_UP    = $01
@@ -100,13 +106,26 @@
 // Objekt
 .const NUM_MON    = 5             // monster-slottar (sprite 3-7)
 .const NUM_BUL    = 2             // skott (sprite 1-2)
-.const BUL_SPEED  = 7
 
 .const T_NONE     = 0
-.const T_WALKER   = 1
-.const T_FLYER    = 2
-.const T_SHIP     = 3
-.const T_BOOM     = 4
+.const T_WALKER   = 1             // går på marken
+.const T_FLYER    = 2             // fladdermus, flyger i sinusvåg
+.const T_SHIP     = 3             // rymdskeppet som står på marken
+.const T_BOOM     = 4             // explosion
+.const T_FLOATER  = 5             // svävar en bit ovanför marken
+.const T_HOPPER   = 6             // hoppar fram längs marken
+.const T_SEEKER   = 7             // flygande mina som söker sig mot skeppet
+.const NUM_TYPES  = 8
+
+// Skottriktningar (index i shotXXX-tabellerna)
+.const SHOT_RIGHT    = 0
+.const SHOT_LEFT     = 1
+.const SHOT_UP       = 2
+.const SHOT_UPRIGHT  = 3
+.const SHOT_UPLEFT   = 4
+.const SHOT_FLY      = 5
+.const SHOT_FLYUP    = 6
+.const SHOT_FLYDOWN  = 7
 
 // Ljudeffekter
 .const SFX_SHOOT  = 0
@@ -156,8 +175,8 @@
 .const invuln      = $29
 .const lives       = $2a
 .const score       = $2b          // 3 byte BCD, mest signifikant först
-.const distLo      = $2e
-.const distHi      = $2f
+.const level       = $2e          // nivå 1-99
+.const wave        = $2f          // våg 0-3 i aktuell fas
 .const pendingSwap = $30
 .const pendingD018 = $31
 .const pendingD016 = $32
@@ -169,7 +188,7 @@
 .const gPit        = $38
 .const gPitCool    = $39
 .const spawnTimer  = $3a
-.const difficulty  = $3b
+.const waveCol     = $3b          // kolumner in i vågen
 .const landDelay   = $3c
 .const shipExists  = $3d
 .const frameCount  = $3e
@@ -209,6 +228,12 @@
 .const genGap      = $64          // max ceil+floor (=PLAY_ROWS - minsta öppning)
 .const gCeilT      = $65          // flygfasen: mål för taket
 .const gFloorT     = $66          // flygfasen: mål för golvet
+.const facing      = $67          // 0 = höger, 1 = vänster
+.const hudMsgTimer = $88
+.const maxMon      = $89          // max antal monster samtidigt
+.const memSrc      = $8a          // 2 byte
+.const memDst      = $8c          // 2 byte
+.const memLen      = $8e          // 2 byte
 .const sprX        = $68          // 8 byte
 .const sprY        = $70          // 8 byte
 .const sprPtr      = $78          // 8 byte
@@ -235,6 +260,9 @@
 .const B_XLO       = $c142
 .const B_XHI       = $c144
 .const B_Y         = $c146
+.const B_DX        = $c148
+.const B_DY        = $c14a
+.const M_VY        = $c160        // hoppande monster: hastighet (px*4)
 
 .const SFX_TIMER   = $c150
 .const SFX_FREQ    = $c153

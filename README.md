@@ -5,10 +5,11 @@ Ett grottspel för Commodore 64, skrivet i 6502-assembler för
 
 Du springer genom en grotta som scrollar åt vänster. Marken och taket går
 upp och ner, det finns trappsteg att hoppa upp för och gropar att hoppa över,
-och små monster kommer springande från höger. Skjut dem eller hoppa över dem.
-Efter en stund står ett rymdskepp och väntar på marken. Spring in i det, så
-flyger du vidare genom en slingrande grotta där monstren både springer på
-marken och flyger i luften.
+och monster kommer från höger: gående, svävande och hoppande. Skjut dem
+framåt, bakåt, uppåt eller snett uppåt, eller hoppa över dem. Efter en stund
+står ett rymdskepp och väntar på marken. Spring in i det, så flyger du vidare
+genom en slingrande grotta där monstren både springer på marken och flyger i
+luften. Efter flygturen landar skeppet och nästa nivå börjar, med fler monster.
 
 ![Huvudmenyn](docs/menu.png)
 ![Springfasen](docs/run.png)
@@ -29,35 +30,85 @@ Använd en joystick i **port 2**.
 Menyn visar de **10 bästa resultaten** (namn och poäng). Det senast
 inskrivna resultatet visas i gult. Starta en omgång med **FIRE**.
 
-### Fas 1: springa
+### Nivåer och vågor
 
-| Joystick       | Funktion                                      |
-|----------------|-----------------------------------------------|
-| Upp            | Hoppa (släpp tidigt för ett lägre hopp)       |
-| Höger / vänster| Spring fortare eller bromsa                   |
-| Fire           | Skjut (håll in för att skjuta automatiskt)    |
+Varje **nivå** består av en springfas och en flygfas. Varje fas har **4 vågor**
+som är ungefär 13 sekunder långa. I varje våg kommer en ny blandning av monster.
+Vågens nummer visas en stund på översta raden och står sedan i HUD:en som
+`LV 01-2` (nivå 1, våg 2).
+
+**Antalet monster som kan vara ute samtidigt ökar** med våg och nivå:
+
+| Nivå | Våg 1-2 | Våg 3-4 |
+|------|---------|---------|
+| 1    | 2       | 3       |
+| 2    | 3       | 4       |
+| 3    | 4       | 5       |
+| 4+   | 5       | 5       |
+
+Monstren kommer också tätare på senare vågor och nivåer, och från nivå 3 blir
+tunneln i flygfasen smalare.
+
+### Fas 1: springa (ca 50 sekunder)
+
+| Joystick        | Funktion                                    |
+|-----------------|---------------------------------------------|
+| Upp             | Hoppa (släpp tidigt för ett lägre hopp)     |
+| Höger / vänster | Spring fortare eller bromsa, vänd gubben    |
+| Fire            | Skjut (håll in för att skjuta automatiskt)  |
+
+Skottets riktning beror på vad gubben gör:
+
+| Gubben…                               | Skottet går…                        |
+|---------------------------------------|-------------------------------------|
+| står stilla eller springer på marken  | rakt fram eller bakåt, dit han tittar |
+| hoppar (joysticken bara uppåt)        | rakt upp                            |
+| hoppar och håller höger/vänster       | snett uppåt åt det hållet           |
 
 * Du kan inte springa rakt upp för ett trappsteg. Du måste hoppa.
 * Om en vägg skjuter dig ut över vänsterkanten blir du krossad.
 * Ramlar du ned i en grop (med piggar i botten) förlorar du ett liv.
-* Gröna monster kommer gående från höger. Skjut dem eller hoppa över dem.
-  Rör du ett monster förlorar du ett liv.
+* Rör du ett monster förlorar du ett liv.
 
-### Fas 2: rymdskeppet
+| Våg | Monster                                                      |
+|-----|--------------------------------------------------------------|
+| 1   | Gående (gröna)                                               |
+| 2   | Svävande (blå) + några gående                                |
+| 3   | Hoppande (orange) + gående och svävande                      |
+| 4   | Alla sorter blandat                                          |
 
-Efter ungefär 25 sekunder planar marken ut och ett **rymdskepp** står och
-väntar. Spring in i det för att kliva ombord (+100 poäng). Missar du skeppet
-kommer ett nytt.
+Svävarna håller sig en bit ovanför marken och guppar. De låga skjuter du
+rakt fram. De höga kan du gå under, men hoppar du in i dem dör du. Skjut dem
+uppåt eller snett uppåt medan du hoppar.
+
+### Fas 2: rymdskeppet (ca 50 sekunder)
+
+Efter springfasen planar marken ut och ett **rymdskepp** står och väntar.
+Spring in i det för att kliva ombord (+100 poäng). Missar du skeppet kommer
+ett nytt.
 
 | Joystick   | Funktion                                    |
 |------------|---------------------------------------------|
 | Alla håll  | Styr skeppet                                |
-| Fire       | Skjut                                       |
+| Fire       | Skjut rakt fram                             |
+| Fire + upp | Skjut snett uppåt                           |
+| Fire + ned | Skjut snett nedåt                           |
 
 * Grottan slingrar sig upp och ner. Nuddar du taket eller golvet exploderar
   skeppet.
-* Nu kommer både **gående** (gröna) och **flygande** (lila) monster.
-* Svårigheten ökar med tiden: monstren kommer tätare och grottan blir smalare.
+
+| Våg | Monster                                                      |
+|-----|--------------------------------------------------------------|
+| 1   | Flygande fladdermöss (lila)                                  |
+| 2   | Fladdermöss + gående på marken                               |
+| 3   | Sökminor (röda) som glider mot skeppets höjd + svävare       |
+| 4   | Alla sorter blandat, även hoppare                            |
+
+### Landning och nästa nivå
+
+Efter flygfasens fjärde våg visas "PREPARE TO LAND". Under tiden marken
+planar ut kan du flyga fritt utan att krocka med grottan. Sedan landar
+autopiloten skeppet, du kliver ut och nästa nivå börjar.
 
 ### Poäng och liv
 
@@ -65,7 +116,10 @@ kommer ett nytt.
 |-----------------------------|-------|
 | Varje tecken-kolumn du tar dig fram | 1 |
 | Gående monster              | 20    |
-| Flygande monster            | 40    |
+| Svävande monster            | 30    |
+| Hoppande monster            | 30    |
+| Fladdermus                  | 40    |
+| Sökmina                     | 50    |
 | Kliva in i rymdskeppet      | 100   |
 
 Du har **3 liv**. När du dör blinkar du en stund och kan då inte skadas av
@@ -126,7 +180,7 @@ tools/
   make_gfx.py     Ritar om grafiken från ASCII-konst -> gfx_*.asm
   ka_subset.py    Liten assembler för den KickAss-syntax spelet använder (test)
   emu.py          Minimal C64-testmiljö (py65) för provkörning och skärmbilder
-  smoke_test.py   Automatiskt test: meny -> springa -> flyga -> game over -> topplista
+  smoke_test.py   Automatiskt test: meny -> nivå 1 (alla vågor) -> nivå 2 -> game over -> topplista
 build.sh          Bygger med KickAssembler
 ```
 
@@ -149,15 +203,17 @@ räknas ut automatiskt från bilderna.
 
 | Adress        | Innehåll                                                   |
 |---------------|------------------------------------------------------------|
-| `$0400-$07ff` | Skärm A                                                    |
-| `$0801-$1fff` | BASIC-rad och programkod                                   |
-| `$2000-$27ff` | Teckenset (tecken 0-63 kopieras från ROM, 64+ är grottan)  |
-| `$2800-$2bff` | Skärm B                                                    |
-| `$3000-$33ff` | Sprites och sinustabell                                    |
+| `$0801-$3fff` | BASIC-rad, programkod och grafikdata (källa)               |
+| `$4000-$43ff` | Skärm A (VIC-bank 1)                                       |
+| `$4400-$47ff` | Skärm B                                                    |
+| `$4800-$4fff` | Teckenset (tecken 0-63 kopieras från ROM, 64+ är grottan)  |
+| `$5000-$57ff` | Sprites (kopieras hit vid start)                           |
 | `$c000-$c1ff` | Ringbuffert för grottan, monster, skott, ljud (körtid)     |
 
-BASIC- och KERNAL-ROM stängs av (`$01 = $35`), så spelet har hela zero page
-och egna avbrottsvektorer på `$fffa-$ffff`.
+Grafiken ligger i VIC-bank 1 (`$dd00`). Programfilen blir då sammanhängande
+utan tomrum, och koden har plats ända upp till `$3fff`. BASIC- och KERNAL-ROM
+stängs av (`$01 = $35`), så spelet har hela zero page och egna
+avbrottsvektorer på `$fffa-$ffff`.
 
 ### Mjuk scrollning med dubbelbuffring
 
@@ -186,7 +242,7 @@ kollisioner mot berget bara är en tabelluppslagning.
 
 * **Springfasen:** segment på 3-10 kolumner med trappsteg (1-2 rader), ändringar
   i taket och gropar som är 3-4 kolumner breda. Öppningen är alltid minst 10 rader.
-* **Landningen:** marken planar ut till en jämn yta där skeppet står.
+* **Landningen** (före och efter flygfasen): marken planar ut till en jämn yta.
 * **Flygfasen:** generatorn väljer nya mål för tak och golv och glider mot dem
   ett steg varannan kolumn. Det ger en slingrande tunnel som är 7-11 rader hög.
 
@@ -201,6 +257,11 @@ bildruta, så varje omgång blir olika beroende på när man trycker fire.
   gubbens vänstra och högra kant.
 * Kollisioner mellan sprites (skott, monster, spelare, skepp) är
   boxkollisioner i 16-bitars x-led. Hårdvarukollisionerna används inte.
+* Skotten har en egen hastighet i x och y (`B_DX`/`B_DY`). Riktningen väljs
+  ur en tabell med åtta riktningar (`shotDX`/`shotDY` i `player.asm`).
+* Varje monstertyp har en egen rörelse- och startrutin som anropas via
+  hopptabeller (`moveTab`/`spawnTab`). Vilka typer som kommer i en våg står i
+  `spawnTypes` i `enemies.asm`.
 
 ### Sprites
 
@@ -208,7 +269,7 @@ bildruta, så varje omgång blir olika beroende på när man trycker fire.
 |--------|--------------------------------|
 | 0      | Gubben / rymdskeppet           |
 | 1-2    | Spelarens skott                |
-| 3-7    | Monster, rymdskeppet på marken, explosioner |
+| 3-7    | Monster (max 5), rymdskeppet på marken, explosioner |
 
 Alla sprites är multicolor (delade färger: vit och ljusröd).
 

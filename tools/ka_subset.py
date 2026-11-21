@@ -532,8 +532,7 @@ def main():
         with open(a.sym, 'w') as f:
             json.dump({'labels': ctx.labels, 'consts': ctx.consts}, f, indent=1, sort_keys=True)
     # segmentöversikt
-    code_end = max(a for a in mem if a < 0x2000)
-    print("OK: $%04x-$%04x (%d byte). Kod slutar på $%04x." % (lo, hi, len(data) - 2, code_end))
+    print("OK: $%04x-$%04x (%d byte)." % (lo, hi, len(data) - 2))
     for name, addr in segments:
         print("  segment %-12s $%04x" % (name or '-', addr))
 

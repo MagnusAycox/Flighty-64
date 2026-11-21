@@ -39,11 +39,13 @@ start:
 
     lda #$0b                // skärmen av under init
     sta $d011
-    lda $dd00               // VIC-bank 0 ($0000-$3fff)
-    ora #$03
+    lda $dd00               // VIC-bank 1 ($4000-$7fff)
+    and #$fc
+    ora #$02
     sta $dd00
 
     jsr copyCharRom
+    jsr copyGfx
     jsr initSid
     jsr initVic
 
@@ -200,6 +202,60 @@ copyCharRom:
     rts
 
 // -------------------------------------------------------------------
+// Kopiera egna tecken och sprites till VIC-bank 1
+// -------------------------------------------------------------------
+copyGfx:
+    lda #<gfxChars
+    sta memSrc
+    lda #>gfxChars
+    sta memSrc+1
+    lda #<(CHARSET + 64*8)
+    sta memDst
+    lda #>(CHARSET + 64*8)
+    sta memDst+1
+    lda #<GFX_CHARS_LEN
+    sta memLen
+    lda #>GFX_CHARS_LEN
+    sta memLen+1
+    jsr memCopy
+    lda #<gfxSprites
+    sta memSrc
+    lda #>gfxSprites
+    sta memSrc+1
+    lda #<SPRITES
+    sta memDst
+    lda #>SPRITES
+    sta memDst+1
+    lda #<GFX_SPRITES_LEN
+    sta memLen
+    lda #>GFX_SPRITES_LEN
+    sta memLen+1
+    // fall igenom
+
+// memCopy: kopiera memLen byte från (memSrc) till (memDst)
+memCopy:
+    ldy #0
+!loop:
+    lda memLen
+    ora memLen+1
+    beq !done+
+    lda (memSrc),y
+    sta (memDst),y
+    inc memSrc
+    bne !+
+    inc memSrc+1
+!:  inc memDst
+    bne !+
+    inc memDst+1
+!:  lda memLen
+    bne !+
+    dec memLen+1
+!:  dec memLen
+    jmp !loop-
+!done:
+    rts
+
+// -------------------------------------------------------------------
 // Grundinställningar för VIC
 // -------------------------------------------------------------------
 initVic:
@@ -244,9 +300,9 @@ startGame:
     sta score
     sta score+1
     sta score+2
-    sta distLo
-    sta distHi
-    sta difficulty
+    sta wave
+    sta waveCol
+    sta facing
     sta ringBase
     sta dispBuf
     sta needCopy
@@ -273,6 +329,8 @@ startGame:
     sta phase
     lda #3
     sta lives
+    lda #1
+    sta level
     lda #2
     sta scrollSpeed
     lda #7
@@ -318,7 +376,8 @@ startGame:
     sta needCopy
     jsr copyFinish
 
-    jsr drawHud
+    jsr setMaxMon
+    jsr showWaveMsg
 
     lda #60
     sta px

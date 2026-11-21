@@ -26,9 +26,9 @@ import os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
 
-SPRITE_BASE_ADDR = 0x3000
-CHAR_BASE_ADDR = 0x2200       # tecken 64 och uppåt i teckensetet på $2000
-FIRST_CHAR = 64
+VIC_BANK = 0x4000
+SPRITE_BASE_ADDR = 0x5000     # spritedata kopieras hit vid start
+FIRST_CHAR = 64               # egna tecken: 64 och uppåt
 
 SPR_MAP = {'.': 0, 'w': 1, 'b': 2, 's': 3}
 CHR_MAP = {'.': 0, 'r': 1, 'd': 2, 'g': 3}
@@ -198,9 +198,10 @@ SPRITES = [
         ".....bb.....",
     ]),
     ("BULLET", "top", [
-        "..bbbw......",
-        "sbbbbbw.....",
-        "..bbbw......",
+        ".bb.........",
+        "bwwb........",
+        "bwwb........",
+        ".bb.........",
     ]),
     ("BOOM0", "center", [
         ".....s......",
@@ -226,7 +227,87 @@ SPRITES = [
         ".s...s...s..",
         "s....b....s.",
     ]),
+    ("FLOAT0", "top", [
+        "...bbbbbb...",
+        "..bbbbbbbb..",
+        ".bbwwbbwwbb.",
+        ".bbwsbbwsbb.",
+        ".bbbbbbbbbb.",
+        ".bbbbssbbbb.",
+        ".bbbbbbbbbb.",
+        "..b.b..b.b..",
+        "..b.b..b.b..",
+        ".b..b..b..b.",
+        ".b...b..b.b.",
+        "..b..b.b..b.",
+    ]),
+    ("FLOAT1", "top", [
+        "...bbbbbb...",
+        "..bbbbbbbb..",
+        ".bbwwbbwwbb.",
+        ".bbwsbbwsbb.",
+        ".bbbbbbbbbb.",
+        ".bbbbssbbbb.",
+        ".bbbbbbbbbb.",
+        "..b.b..b.b..",
+        ".b..b..b..b.",
+        ".b.b..b..b..",
+        "..b.b..b.b..",
+        "..b..b..b.b.",
+    ]),
+    ("HOP0", "bottom", [
+        "..ww....ww..",
+        ".wsw....wsw.",
+        ".bbbbbbbbbb.",
+        "bbbbbbbbbbbb",
+        "bbssssssssbb",
+        "bbbbbbbbbbbb",
+        ".bbbbbbbbbb.",
+        "bb.bb..bb.bb",
+        "s..s....s..s",
+    ]),
+    ("HOP1", "bottom", [
+        "..ww....ww..",
+        ".wsw....wsw.",
+        ".bbbbbbbbbb.",
+        "bbbbbbbbbbbb",
+        "bbbssssssbbb",
+        ".bbbbbbbbbb.",
+        "..bbbbbbbb..",
+        "..b.b..b.b..",
+        ".b..b..b..b.",
+        ".b..b..b..b.",
+        "ss........ss",
+    ]),
+    ("SEEK0", "center", [
+        ".....s......",
+        ".s...b...s..",
+        "..bbbbbbb...",
+        "..bwwwwwb...",
+        "sbbwwsswbbs.",
+        "..bwwwwwb...",
+        "..bbbbbbb...",
+        ".s...b...s..",
+        ".....s......",
+    ]),
+    ("SEEK1", "center", [
+        "...s...s....",
+        "....bbb.....",
+        "..bbbbbbb...",
+        "s.bwwwwwb.s.",
+        ".bbwwsswbb..",
+        "s.bwwwwwb.s.",
+        "..bbbbbbb...",
+        "....bbb.....",
+        "...s...s....",
+    ]),
 ]
+
+# Spegelvända gubbar (springer åt vänster)
+_by_name = {n: (a, r) for n, a, r in SPRITES}
+_mirrored = [(n.replace("RUN", "RUNL").replace("JUMP", "JUMPL"), a, [row[::-1] for row in r])
+             for n, a, r in SPRITES if n in ("RUN0", "RUN1", "JUMP")]
+SPRITES = SPRITES[:3] + _mirrored + SPRITES[3:]
 
 # Kollisionsboxar (union av ramar)
 BOXES = {
@@ -235,6 +316,9 @@ BOXES = {
     "WALK": ["WALK0", "WALK1"],
     "BAT": ["BAT0", "BAT1"],
     "BULLET": ["BULLET"],
+    "FLOAT": ["FLOAT0", "FLOAT1"],
+    "HOP": ["HOP0", "HOP1"],
+    "SEEK": ["SEEK0", "SEEK1"],
 }
 
 # ----------------------------------------------------------------- tecken
@@ -380,12 +464,15 @@ def main():
     const.append("// GENERERAD FIL - ändra tools/make_gfx.py och kör om den.")
     const.append("// Spritepekare, teckenkoder och kollisionsboxar.")
     const.append("")
-    ptr0 = SPRITE_BASE_ADDR // 64
+    ptr0 = (SPRITE_BASE_ADDR - VIC_BANK) // 64
     for i, (name, _, _) in enumerate(SPRITES):
         const.append(".const SPR_%-8s = %d" % (name, ptr0 + i))
     const.append("")
     for i, (name, _) in enumerate(CHARS):
         const.append(".const CH_%-8s = %d" % (name, FIRST_CHAR + i))
+    const.append("")
+    const.append(".const GFX_CHARS_LEN   = %d" % (len(CHARS) * 8))
+    const.append(".const GFX_SPRITES_LEN = %d" % (len(SPRITES) * 64))
     const.append("")
     const.append("// Kollisionsboxar i spritepixlar (inklusive), union av alla ramar")
     for bname, frames in BOXES.items():
@@ -405,7 +492,8 @@ def main():
     data.append("// ---------------------------------------------------------------")
     data.append("// Egna tecken (multicolor) - tecken %d och uppåt" % FIRST_CHAR)
     data.append("// ---------------------------------------------------------------")
-    data.append('*= $%04x "Cave chars"' % CHAR_BASE_ADDR)
+    data.append("// (kopieras till teckensetet vid start)")
+    data.append("gfxChars:")
     for name, rows in CHARS:
         data.append("// %s" % name)
         vals = [encode_row(r, CHR_MAP, 4) for r in rows]
@@ -415,10 +503,11 @@ def main():
     data.append("// ---------------------------------------------------------------")
     data.append("// Sprites (multicolor, 64 byte per sprite)")
     data.append("// ---------------------------------------------------------------")
-    data.append('*= $%04x "Sprites"' % SPRITE_BASE_ADDR)
+    data.append("// (kopieras till $%04x vid start)" % SPRITE_BASE_ADDR)
+    data.append("gfxSprites:")
     for name, _, _ in SPRITES:
         rows = padded[name]
-        data.append("spr_%s:" % name.lower())
+        data.append("// %s" % name)
         vals = sprite_bytes(rows)
         for y, r in enumerate(rows):
             b = vals[y * 3:y * 3 + 3]

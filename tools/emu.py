@@ -67,6 +67,7 @@ class C64:
         load = prg[0] | (prg[1] << 8)
         self.ram[load:load + len(prg) - 2] = prg[2:]
         self.ram[1] = 0x37
+        self.io[0xd00] = 0x97     # CIA2 port A: VIC-bank 0 som efter KERNAL-start
         self.syms = syms
         self.cycles = 0
         self.line = 0
@@ -137,8 +138,11 @@ class C64:
             if rr == 0x0d:
                 return 0
             return self.io[0xc00 + rr]
-        if 0xd00 <= r < 0xe00:
-            return 0
+        if 0xd00 <= r < 0xe00:   # CIA2
+            rr = r & 0x0f
+            if rr == 0x0d:
+                return 0
+            return self.io[0xd00 + rr]
         if 0x400 <= r < 0x800:   # SID
             return 0
         return self.io[r]
@@ -162,6 +166,7 @@ class C64:
     def snapshot_line(self):
         self.line_regs[self.line] = (self.io[0x11], self.io[0x16], self.io[0x18],
                                      self.io[0x20], self.io[0x21], self.io[0x22], self.io[0x23])
+        self.bank = (3 - (self.io[0xd00] & 3)) * 0x4000
 
     def run_frame(self):
         target = (self.frame + 1) * LINES * CYCLES_PER_LINE
@@ -230,8 +235,9 @@ class C64:
             mc = d016 & 0x10
             x0 = 32 if d016 & 8 else 39
             x1 = 352 if d016 & 8 else 343
-            screen = ((d018 >> 4) & 15) * 0x400
-            charset = ((d018 >> 1) & 7) * 0x800
+            bank = getattr(self, 'bank', 0)
+            screen = bank + ((d018 >> 4) & 15) * 0x400
+            charset = bank + ((d018 >> 1) & 7) * 0x800
             bg = PALETTE[d021 & 15]
             for x in range(x0, x1):
                 px[x, y] = bg
@@ -244,8 +250,8 @@ class C64:
                 code = self.ram[screen + row * 40 + col]
                 color = self.io[0x800 + row * 40 + col] & 15
                 caddr = charset + code * 8 + cy
-                if 0x1000 <= caddr < 0x2000:
-                    bits = self.charrom[caddr - 0x1000]
+                if bank in (0, 0x8000) and 0x1000 <= caddr - bank < 0x2000:
+                    bits = self.charrom[caddr - bank - 0x1000]
                 else:
                     bits = self.ram[caddr]
                 ix = 32 + X
@@ -270,7 +276,7 @@ class C64:
                     continue
                 sxp = self.io[n * 2] | (0x100 if self.io[0x10] & (1 << n) else 0)
                 ptr = self.ram[screen + 0x3f8 + n]
-                base = ptr * 64 + dy * 3
+                base = bank + ptr * 64 + dy * 3
                 b = (self.ram[base] << 16) | (self.ram[base + 1] << 8) | self.ram[base + 2]
                 colr = self.io[0x27 + n] & 15
                 smc = self.io[0x1c] & (1 << n)
