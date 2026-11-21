@@ -31,9 +31,9 @@ SPRITE_BASE_ADDR = 0x5000     # spritedata kopieras hit vid start
 FIRST_CHAR = 64               # egna tecken: 64 och uppåt
 
 LOGO_WIDTH = 272              # "SOFTWARE OF SWEDEN": 16 bokstäver x 16 px + 2 mellanslag x 8 px
-LOGO_SWAY = 31                # svängning 0-31 pixlar (38-kolumnsfönstret är 304 px)
+LOGO_WAVE = 7                 # bokstävernas våg: 0-7 pixlar (finscroll per rasterlinje)
 FLAG_BAR_W = 6
-FLAG_X_MAX = (LOGO_WIDTH - FLAG_BAR_W) // 2   # tabellen lagrar x/2
+FLAG_HALF = (LOGO_WIDTH - FLAG_BAR_W) // 2    # lodräta balken: ± så här långt från mitten
 BOUNCE = 19                   # 24 rader hög logo - 5 rader balk
 
 SPR_MAP = {'.': 0, 'w': 1, 'b': 2, 's': 3}
@@ -534,13 +534,14 @@ def main():
     data.append("")
 
     # Tabeller för startskärmens logo (256 steg per period)
-    data.append("// Logons svängning i sidled: 0-%d pixlar (hel sinusperiod)" % LOGO_SWAY)
-    data.append("swayTab:")
-    data += fmt_bytes([int(round(LOGO_SWAY / 2 * (1 + math.sin(2 * math.pi * i / 256))))
-                       for i in range(256)], 16)
-    data.append("// Flaggans lodräta balk, x/2 inom texten (hel sinus: mjuka vändningar)")
+    data.append("// Bokstävernas våg: $d016-finscroll 0-%d per rasterlinje (64 steg per period)" % LOGO_WAVE)
+    data.append("waveTab:")
+    data += fmt_bytes([int(round(LOGO_WAVE / 2 * (1 + math.sin(2 * math.pi * i / 64))))
+                       for i in range(64)], 16)
+    data.append("// Flaggans lodräta balk: avstånd 0-%d px från mitten, en kvarts sinusperiod." % FLAG_HALF)
+    data.append("// Koden speglar den till en hel period (mjuka vändningar).")
     data.append("flagXTab:")
-    data += fmt_bytes([int(round(FLAG_X_MAX / 2 * (1 + math.sin(2 * math.pi * i / 256 - math.pi / 2))))
+    data += fmt_bytes([int(round(FLAG_HALF * math.sin(math.pi / 2 * (i + 0.5) / 256)))
                        for i in range(256)], 16)
     data.append("// Flaggans vågräta balk: översta raden 0-%d. Halv sinus (|sin|):" % BOUNCE)
     data.append("// skarp vändning i nederkant, mjuk i överkant")
@@ -549,9 +550,9 @@ def main():
                        for i in range(256)], 16)
     data.append("")
 
-    with open(os.path.join(SRC, "gfx_const.asm"), "w") as f:
+    with open(os.path.join(SRC, "gfx_const.asm"), "w", encoding="utf-8") as f:
         f.write("\n".join(const) + "\n")
-    with open(os.path.join(SRC, "gfx_data.asm"), "w") as f:
+    with open(os.path.join(SRC, "gfx_data.asm"), "w", encoding="utf-8") as f:
         f.write("\n".join(data) + "\n")
     print("Wrote gfx_const.asm and gfx_data.asm")
 

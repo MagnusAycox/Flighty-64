@@ -31,10 +31,12 @@ def make_font():
     """Eget 8x8-typsnitt (bara för skärmdumpar) med C64-skärmkodsordning."""
     from PIL import Image, ImageDraw, ImageFont
     font = None
-    for p in ["/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
-              "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf"]:
+    top = -2
+    for p, size in [("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 9),
+                    ("/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf", 9),
+                    ("C:/Windows/Fonts/consolab.ttf", 10)]:
         if os.path.exists(p):
-            font = ImageFont.truetype(p, 9)
+            font = ImageFont.truetype(p, size)
             break
     rom = bytearray(4096)
     for code in range(64):
@@ -49,7 +51,7 @@ def make_font():
         img = Image.new('1', (8, 8), 0)
         d = ImageDraw.Draw(img)
         if font:
-            d.text((0, -2), ch, fill=1, font=font)
+            d.text((0, top), ch, fill=1, font=font)
         for y in range(8):
             v = 0
             for x in range(8):
@@ -125,7 +127,9 @@ class C64:
         if r < 0x400:
             r &= 0x3f
             if r == 0x12:
-                return self.line & 0xff
+                # py65 läser när instruktionen börjar; en riktig 6502 läser
+                # en absolut adress (cpx/lda $d012) i instruktionens 4:e cykel
+                return ((self.cycles + 3) // CYCLES_PER_LINE) % LINES & 0xff
             if r == 0x11:
                 return (self.io[0x11] & 0x7f) | ((self.line >> 8) << 7)
             if r == 0x19:

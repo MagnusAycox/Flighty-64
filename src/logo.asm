@@ -4,15 +4,15 @@
 //  * Stora bokstäver (16x24 px) byggs vid start av C64:ans egna
 //    ROM-tecken: varje pixel blir 2x3 pixlar. Tecknen är inverterade,
 //    så bokstaven är ett "hål" där bakgrundsfärgen ($d021) syns.
-//  * Hela logon svänger i sidled längs en sinuskurva (finscroll +
-//    förskjutning i hela tecken).
+//  * Bokstäverna böljar i sidled: varje rasterlinje får en egen finscroll
+//    ($d016), så vänsterkanten följer en sinuskurva som vandrar uppåt.
 //  * Genom hålen syns en svensk flagga som studsar:
 //      - den vågräta gula balken = $d021 byts till gult på några
 //        rasterlinjer. Den studsar i en halv sinus (|sin|): skarp
 //        vändning i nederkant, mjuk i överkant.
 //      - den lodräta gula balken = sprite 0 bakom förgrunden ($d01b),
-//        så den syns bara genom bokstäverna. Den glider höger-vänster
-//        med vanlig sinus (mjuka vändningar).
+//        så den syns bara genom bokstäverna. Den glider långsamt
+//        höger-vänster med vanlig sinus (mjuka vändningar).
 // ===================================================================
 
 .encoding "screencode_upper"
@@ -25,6 +25,16 @@
 .const LOGO_LEN    = 18           // tecken i texten
 .const NUM_LOGO_LETTERS = 10
 .const FLAG_BAR_H  = 5            // vågräta balkens höjd i rader (lodräta: 6 px)
+.const LOGO_COL    = 2            // textens första kolumn
+.const WAVE_STEP   = 3            // vågens fas per rasterlinje (64 = en period)
+// Lodräta balkens mittläge (sprite-x): textens vänsterkant (kolumn + halva
+// vågen) + halva vägen balken kan röra sig inom texten
+.const FLAG_CENTER = 24 + 8*LOGO_COL + 4 + 133
+// Rasterloopen börjar på linjen före logon. Tabellerna LOGO_LINES och
+// LOGO_D016 indexeras med rasterlinjen: post 0 = linje 58, 1-24 = logon,
+// 25 = linje 83 (första linjen under logon).
+.const LOGO_RL0    = LOGO_LINE0-1
+.const LOGO_RLEND  = LOGO_LINE0+LOGO_H+1
 
 // Bokstäverna som behövs, i den ordning de byggs
 logoLetters:
@@ -145,8 +155,14 @@ logoStart:
     sta COLORRAM + LOGO_ROW*40,x
     dex
     bpl !loop-
-    lda #$ff
-    sta logoCoarse          // tvinga omritning
+    jsr drawLogo
+    lda #COL_BLACK          // linjen före och efter logon
+    sta LOGO_LINES
+    sta LOGO_LINES+LOGO_H+1
+    lda #D016_HUD           // 38 kolumner döljer kanten som avslöjas
+    sta LOGO_D016
+    lda #D016_MENU          // resten av menyn: 40 kolumner, ingen scroll
+    sta LOGO_D016+LOGO_H+1
     lda #SPR_FLAGBAR
     sta SCREEN_A+$3f8
     lda #COL_YELLOW
@@ -181,7 +197,7 @@ logoStop:
     rts
 
 // -------------------------------------------------------------------
-// drawLogo: rita logoraderna med förskjutningen logoCoarse
+// drawLogo: rita logoraderna (texten börjar i kolumn LOGO_COL)
 // -------------------------------------------------------------------
 drawLogo:
     ldx #39
@@ -192,9 +208,7 @@ drawLogo:
     sta SCREEN_A + LOGO_ROW*40+80,x
     dex
     bpl !loop-
-    lda logoCoarse
-    clc
-    adc #1
+    lda #LOGO_COL
     sta tmp0                // kolumn
     ldx #0
 !ch:
@@ -231,30 +245,34 @@ drawLogo:
 // logoUpdate: en gång per bildruta i menyn (i vblank)
 // -------------------------------------------------------------------
 logoUpdate:
-    inc swayPhase
-    inc flagPhase
-    inc flagPhase
+    inc wavePhase
     lda bouncePhase
     clc
     adc #3
     sta bouncePhase
-
-    // svängning i sidled: finscroll + hela tecken
-    ldx swayPhase
-    lda swayTab,x
-    sta logoOff
-    and #7
-    ora #D016_HUD           // 38 kolumner döljer kanten som avslöjas
-    sta logoD016
-    lda logoOff
-    lsr
-    lsr
-    lsr
-    cmp logoCoarse
-    beq !+
-    sta logoCoarse
-    jsr drawLogo
+    inc flagPhase           // 1024 bildrutor (ca 20 s) per varv
+    bne !+
+    inc flagQuad
 !:
+    // bokstävernas våg: egen finscroll för varje rasterlinje
+    lda wavePhase
+    sta tmp0
+    ldx #0
+!loop:
+    lda tmp0
+    and #63
+    tay
+    lda waveTab,y
+    ora #D016_HUD
+    sta LOGO_D016+1,x
+    lda tmp0
+    clc
+    adc #WAVE_STEP
+    sta tmp0
+    inx
+    cpx #LOGO_H
+    bne !loop-
+
     // vågräta balken: vilka rasterlinjer som är gula
     ldx bouncePhase
     lda bounceTab,x
@@ -268,56 +286,92 @@ logoUpdate:
     lda #COL_BLUE
     bcs !+
     lda #COL_YELLOW
-!:  sta LOGO_LINES,x
+!:  sta LOGO_LINES+1,x
     inx
     cpx #LOGO_H
     bne !loop-
-    lda #COL_BLACK          // efter logon
-    sta LOGO_LINES,x
 
-    // lodräta balken: sprite x = 24 + 8 + logoOff + 2*flagX
-    ldx flagPhase
-    lda flagXTab,x
-    asl
-    sta tmp1
-    lda #0
-    rol
-    sta tmp2
-    lda tmp1
-    clc
-    adc logoOff
-    sta tmp1
+    // lodräta balken: x = FLAG_CENTER ± flagXTab. Tabellen är en
+    // kvartsperiod; udda kvartar läses baklänges, kvart 2-3 åt vänster.
+    lda flagPhase
+    tax
+    lda flagQuad
+    lsr
     bcc !+
-    inc tmp2
-!:  lda tmp1
+    txa
+    eor #$ff
+    tax
+!:  lda flagXTab,x
+    sta tmp1
+    lda flagQuad
+    and #2
+    bne !left+
+    lda #<FLAG_CENTER
     clc
-    adc #32
+    adc tmp1
     sta $d000
-    lda tmp2
+    lda #>FLAG_CENTER
     adc #0
+    sta $d010
+    rts
+!left:
+    lda #<FLAG_CENTER
+    sec
+    sbc tmp1
+    sta $d000
+    lda #>FLAG_CENTER
+    sbc #0
     sta $d010
     rts
 
 // -------------------------------------------------------------------
-// logoRaster: körs i raster-avbrottet på linje 55. Sätter finscroll för
-// logoraderna och byter $d021 i början av varje rasterlinje i logon
-// (i vänsterkanten, innan bilden börjar ritas).
+// logoRaster: körs i raster-avbrottet på linje 55. Skriver $d021
+// (flaggans vågräta balk) och $d016 (bokstävernas våg) för varje
+// rasterlinje i logon, linje 58-83.
+//
+// Vanliga linjer: värdena skrivs direkt när linjen börjar (cykel ca
+// 6-16), i vänsterkanten innan texten ritas. Texten börjar i kolumn 2,
+// och det som ligger före den är helt svart oavsett scroll och färg.
+//
+// Badlines (första linjen i varje teckenrad: 59, 67, 75, 83) går inte:
+// där stoppas CPU:n från cykel ca 15 till 55. Värdena för en badline
+// skrivs därför i högerkanten på linjen före (cykel ca 61-71), och
+// loopen hoppar sedan över badlinen.
+//
+// X = rasterlinjen, A/Y = färg/$d016 för den linje som väntas på.
 // -------------------------------------------------------------------
+.const LL = LOGO_LINES - LOGO_RL0   // tabellerna indexerade med rasterlinje
+.const LD = LOGO_D016 - LOGO_RL0
+
 logoRaster:
-    lda logoD016
+    lda #D016_HUD
     sta $d016
-    ldy #LOGO_LINE0
-    ldx #0
-!loop:
-    lda LOGO_LINES,x        // färgen hämtas innan vi väntar
+    ldx #LOGO_RL0
+    lda LL,x
+    ldy LD,x
+!line:
 !wait:
-    cpy $d012
+    cpx $d012
     bne !wait-
+    sta $d021               // början av linjen
+    sty $d016
+    txa
+    and #7
+    cmp #2                  // linjen före en badline (yscroll = 3)?
+    bne !next+
+    ldy #6                  // vänta till högerkanten
+!delay:
+    dey
+    bne !delay-
+    lda LL+1,x              // badlinens värden
+    ldy LD+1,x
     sta $d021
-    iny
+    sty $d016
+    inx                     // hoppa över badlinen
+!next:
     inx
-    cpx #LOGO_H+1
-    bne !loop-
-    lda #D016_MENU          // resten av menyn: 40 kolumner, ingen scroll
-    sta $d016
+    lda LL,x
+    ldy LD,x
+    cpx #LOGO_RLEND
+    bne !line-
     rts

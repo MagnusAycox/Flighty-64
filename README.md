@@ -29,11 +29,12 @@ Använd en joystick i **port 2**.
 
 ### Huvudmenyn
 
-Överst står **SOFTWARE OF SWEDEN** i stora bokstäver. Texten svänger mjukt fram
-och tillbaka i sidled, och genom bokstäverna syns en svensk flagga som
-studsar: det gula korsets vågräta balk studsar upp och ner som en boll
+Överst står **SOFTWARE OF SWEDEN** i stora bokstäver. Bokstäverna böljar i
+sidled: varje rasterlinje är förskjuten lite olika, så textens vänsterkant
+bildar en sinuskurva som vandrar uppåt. Genom bokstäverna syns en svensk
+flagga: det gula korsets vågräta balk studsar upp och ner som en boll
 (skarp vändning i nederkant, mjuk i överkant), och den lodräta balken glider
-höger–vänster.
+långsamt höger–vänster (ett varv tar ca 20 sekunder).
 
 Menyn visar de **10 bästa resultaten** (namn och poäng). Det senast
 inskrivna resultatet visas i gult. Starta en omgång med **FIRE**.
@@ -254,18 +255,23 @@ avbrottsvektorer på `$fffa-$ffff`.
   Varje pixel blir 2×3 pixlar, så en bokstav blir 16×24 pixlar (2×3 tecken).
   Tecknen är **inverterade**: förgrunden är svart runt bokstaven, och själva
   bokstaven är ett hål där bakgrundsfärgen `$d021` syns.
-* **Svängningen i sidled** görs med finscroll (`$d016`) plus förskjutning i
-  hela tecken. Logoraderna visas i 38-kolumnsläge, så kanten som avslöjas
-  när texten flyttas döljs.
-* **Den vågräta gula balken:** raster-avbrottet på linje 55 kör en loop över
-  logons 24 rasterlinjer. Den skriver `$d021` (blått eller gult) i början av
-  varje linje, i vänsterkanten innan bilden ritas. Vilka linjer som är gula
-  läses ur `bounceTab`, som är en halv sinus (1 − |sin|): skarp vändning i
+* **Vågen i sidled:** raster-avbrottet på linje 55 kör en loop över
+  rasterlinjerna 58-83. För varje linje skriver den `$d016` (finscroll 0-7
+  pixlar ur `waveTab`) och `$d021` (blått eller gult). Fasen ökar 3 steg
+  per linje och 1 steg per bildruta, så vågen vandrar. Logoraderna visas i
+  38-kolumnsläge, så kanten som avslöjas när en linje flyttas döljs.
+* **Tidpunkten:** på vanliga linjer skrivs registren direkt när linjen
+  börjar (cykel ca 6-16), innan texten i kolumn 2 ritas. På en badline
+  (första linjen i varje teckenrad) står CPU:n still cykel ca 15-55, så
+  där skrivs värdena i stället i högerkanten på linjen före.
+* **Den vågräta gula balken:** vilka linjer som är gula läses ur
+  `bounceTab`, som är en halv sinus (1 − |sin|): skarp vändning i
   nederkant, mjuk i överkant.
 * **Den lodräta gula balken** är sprite 0, höjdförstorad och placerad
   *bakom* förgrunden (`$d01b`). Den syns därför bara genom bokstavshålen.
-  Dess x-position följer en vanlig sinus (`flagXTab`), så den vänder mjukt
-  i båda ändarna.
+  Dess x-position följer en vanlig sinus, så den vänder mjukt i båda
+  ändarna. `flagXTab` är en kvarts period (256 steg, hela pixlar) som koden
+  speglar till ett helt varv på 1024 bildrutor, ca 1 pixel per bildruta.
 * Höjd- och sidledsrörelsen har olika hastighet, så flaggan rör sig som en
   boll som studsar runt.
 

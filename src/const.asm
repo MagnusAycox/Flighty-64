@@ -237,13 +237,12 @@
 .const memLen      = $8e          // 2 byte
 .const irqTopLine  = $90          // rasterlinje för det övre avbrottet
 .const logoOn      = $91          // 1 = startskärmens logo-raster körs
-.const logoD016    = $92          // $d016 för logoraderna
-.const logoOff     = $93          // logons förskjutning 0-31 px
-.const logoCoarse  = $94          // ... i hela tecken (0-3)
-.const swayPhase   = $95
-.const flagPhase   = $96
+.const wavePhase   = $92          // bokstävernas sinusvåg
+.const flagPhase   = $93          // lodräta balken: steg 0-255 i en kvartsperiod
+.const flagQuad    = $94          // ... och vilken kvartsperiod (0-3)
 .const bouncePhase = $97
-.const LOGO_LINES  = $c180        // 25 byte: $d021 per rasterlinje i logon
+.const LOGO_LINES  = $c180        // 26 byte: $d021 per rasterlinje, linje 58-83
+.const LOGO_D016   = $c1a0        // 26 byte: $d016 per rasterlinje, linje 58-83
 .const sprX        = $68          // 8 byte
 .const sprY        = $70          // 8 byte
 .const sprPtr      = $78          // 8 byte

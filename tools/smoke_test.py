@@ -89,11 +89,14 @@ def main():
     if shots:
         c.render(os.path.join(shots, 'menu.png'))
 
-    # startskärmens logo: blå/gul flagga i logons rasterlinjer, svart utanför
+    # startskärmens logo: blå/gul flagga i logons rasterlinjer, svart utanför,
+    # bokstäverna böljar (egen finscroll per rasterlinje), lodräta balken
+    # glider långsamt (ett varv = 1024 bildrutor)
+    wave = c.ram[addr(c, 'waveTab'):addr(c, 'waveTab') + 64]
     bars = set()
-    sprite_x = set()
+    sprite_x = []
     gif = []
-    for f in range(128):
+    for f in range(1024):
         c.run_frame()
         d021 = [c.line_regs[line][4] & 15 for line in range(55, 87)]
         assert d021[:4] == [0] * 4 and d021[-4:] == [0] * 4, "färgbyte utanför logon: %s" % d021
@@ -101,15 +104,23 @@ def main():
         assert set(inside) == {6, 7}, "logon ska ha blå och gul: %s" % inside
         assert inside.count(7) == 5, "vågräta balken ska vara 5 rader"
         bars.add(inside.index(7))
-        sprite_x.add(c.io[0] | ((c.io[0x10] & 1) << 8))
-        if shots and f % 2 == 0:
+        d016 = [c.line_regs[line][1] for line in range(59, 83)]
+        assert all(v & 0xf8 == 0 for v in d016), "logon ska vara 38 kolumner: %s" % d016
+        xs = [v & 7 for v in d016]
+        assert any(all(xs[i] == wave[(p + 3 * i) & 63] for i in range(24)) for p in range(64)),             "bokstäverna följer inte sinusvågen: %s" % xs
+        assert c.line_regs[83][1] == 0x08, "menyn under logon ska ha 40 kolumner utan scroll"
+        sprite_x.append(c.io[0] | ((c.io[0x10] & 1) << 8))
+        if shots and f < 128 and f % 2 == 0:
             from PIL import Image
             c.render(os.path.join(shots, '.frame.png'), scale=1)
             gif.append(Image.open(os.path.join(shots, '.frame.png')).crop((32, 24, 352, 104)).convert('P'))
     assert c.io[0x1b] & 1 and c.io[0x17] & 1, "flaggbalken ska vara höjdförstorad och bakom texten"
     assert min(bars) == 0 and max(bars) == 19, "balken studsar inte hela vägen: %s" % sorted(bars)
-    assert max(sprite_x) - min(sprite_x) > 200, "lodräta balken rör sig inte i sidled"
-    print("logo: vågrät balk rad %d-%d, lodrät balk x %d-%d" % (min(bars), max(bars), min(sprite_x), max(sprite_x)))
+    steps = [abs(a - b) for a, b in zip(sprite_x, sprite_x[1:])]
+    assert max(steps) <= 1, "lodräta balken ska gå långsamt (max %d px/bildruta)" % max(steps)
+    assert max(sprite_x) - min(sprite_x) > 260, "lodräta balken rör sig inte över hela texten"
+    print("logo: vågrät balk rad %d-%d, lodrät balk x %d-%d (max %d px/bildruta)" % (
+        min(bars), max(bars), min(sprite_x), max(sprite_x), max(steps)))
     if shots:
         os.remove(os.path.join(shots, '.frame.png'))
         gif = [im.resize((640, 160)) for im in gif]
