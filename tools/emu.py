@@ -88,6 +88,7 @@ class C64:
         self.wait_pc = syms['labels']['waitLoop']
         self._snap_pending = False
         self._badline = False
+        self._sprite_ba = []  # (start, slut) i absoluta cykler: sprite-DMA
         self.frame_busy = []  # cykler från waitFrame-retur till nästa waitLoop
         self._busy_start = None
 
@@ -191,15 +192,18 @@ class C64:
             elif pc == self.wait_pc and self._busy_start is not None:
                 self.frame_busy.append(self.cycles - self._busy_start)
                 self._busy_start = None
+            # VIC-II tar bussen (badline, sprite-DMA): CPU:n stannar vid
+            # första läscykeln i fönstret (skrivcykler går igenom). En
+            # instruktion som skulle läsa där körs klart först efteråt.
+            op = ram[pc]
+            reads = mpu.cycletime[op] - 1 - (1 if op in STORE_OPS else 0)
             if self._badline:
-                # Badline: CPU:n stannar vid första läscykeln från cykel 12
-                # (skrivcykler går igenom). En instruktion som skulle läsa
-                # där körs alltså klart först efter stoppet.
-                pos = self.cycles % CYCLES_PER_LINE
-                op = ram[pc]
-                last_read = pos + mpu.cycletime[op] - 1 - (1 if op in STORE_OPS else 0)
-                if last_read >= BA_CYCLE:
+                if self.cycles % CYCLES_PER_LINE + reads >= BA_CYCLE:
                     self.badline_stall()
+            for start, end in self._sprite_ba:
+                if self.cycles < end and self.cycles + reads >= start:
+                    self.advance(end - max(self.cycles, start))
+                    break
             before = mpu.processorCycles
             mpu.step()
             self.advance(mpu.processorCycles - before)
@@ -222,6 +226,27 @@ class C64:
             self._snap_pending = False
         self.cycles += max(0, BA_END - max(pos, BA_CYCLE))
 
+    def sprite_dma_windows(self):
+        # Sprites som syns på nästa linje hämtas i slutet av den här:
+        # sprite n läses i cykel 58+2n (n >= 3 hamnar i nästa linje), och
+        # BA går låg 3 cykler före. CPU:n kan fortsätta efter läsningen.
+        base = (self.cycles // CYCLES_PER_LINE) * CYCLES_PER_LINE
+        nxt = (self.line + 1) % LINES
+        keep = [w for w in self._sprite_ba if w[1] > self.cycles]
+        en = self.io[0x15]
+        for n in range(8):
+            if not en & (1 << n):
+                continue
+            sy = self.io[1 + n * 2] + 1
+            h = 42 if self.io[0x17] & (1 << n) else 21
+            if sy <= nxt < sy + h:
+                start, end = base + 55 + 2 * n, base + 60 + 2 * n
+                if keep and keep[-1][1] >= start:
+                    keep[-1] = (keep[-1][0], max(keep[-1][1], end))
+                else:
+                    keep.append((start, end))
+        self._sprite_ba = keep
+
     def advance(self, c):
         self.cycles += c
         new_line = (self.cycles // CYCLES_PER_LINE) % LINES
@@ -237,6 +262,7 @@ class C64:
             if self.line == self.raster_cmp:
                 self.irq_latch |= 1
             new_line = (self.cycles // CYCLES_PER_LINE) % LINES
+            self.sprite_dma_windows()
         if self._badline and self.cycles % CYCLES_PER_LINE >= 14:
             self.badline_stall()        # t.ex. avbrott som börjar på en badline
         if self._snap_pending and self.cycles % CYCLES_PER_LINE >= self.SNAP_CYCLE:

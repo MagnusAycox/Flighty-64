@@ -264,9 +264,11 @@ avbrottsvektorer på `$fffa-$ffff`.
   senast cykel 12. Ändras finscrollen medan bilden ritas blir det lösa
   pixlar i bakgrundsfärgen. `$d021` kommer strax efter; bakgrunden syns
   ändå inte förrän i bokstäverna. På en badline (första linjen i varje
-  teckenrad) står CPU:n still cykel ca 15-55. Badlinens värden skrivs
-  därför i högerkanten på linjen före, och värdena för linjen efter
-  badlinen skrivs i badlinens högerkant, direkt efter stoppet.
+  teckenrad) står CPU:n still från första läsningen efter cykel 12 till
+  cykel 55. Badlinens värden skrivs därför i högerkanten på linjen före
+  (fönstret är smalt: efter bildfönstret men före cykel 12, annars får hela
+  badlinen förra linjens färg), och värdena för linjen efter badlinen
+  skrivs i badlinens högerkant, direkt efter stoppet.
 * **Den vågräta gula balken:** vilka linjer som är gula läses ur
   `bounceTab`, som är en halv sinus (1 − |sin|): skarp vändning i
   nederkant, mjuk i överkant.

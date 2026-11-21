@@ -341,9 +341,18 @@ logoUpdate:
 // CPU:n still från cykel ca 15 till 55, och loopen hinner inte ikapp
 // till linjen efter. Därför, på linjen före en badline:
 //   1. skriv linjens egna värden som vanligt,
-//   2. vänta till högerkanten och skriv badlinens värden,
-//   3. lägg fram värdena för linjen efter badlinen. Skrivningen hamnar
-//      efter stoppet, i badlinens högerkant (cykel ca 58-66),
+//   2. vänta till högerkanten och skriv badlinens värden. Fönstret är
+//      smalt: efter bildfönstret (cykel ca 54) men före badlinens stopp
+//      (CPU:n stannar vid första läsning från cykel 12). Skrivs $d021 för
+//      sent stannar den till cykel 55, och hela badlinen får förra
+//      linjens färg,
+//   3. lägg fram värdena för linjen efter badlinen. Skrivningen ska ske
+//      efter stoppet, i badlinens högerkant; skulle sty hinna läsa klart
+//      före cykel 12 får badlinen i stället nästa linjes värden.
+//      Uppmätt i VICE (sprite 0:s DMA i slutet av varje linje medräknad):
+//      badlinens $d021 skrivs i badlinens cykel 2-8, och sty för linjen
+//      efter läser tidigast i cykel 12+3. Marginal ca 3 cykler åt båda
+//      hållen; mer går inte med rasterjittret på 7 cykler,
 //   4. hoppa över båda linjerna.
 //
 // X = rasterlinjen, A/Y = färg/$d016 för den linje som väntas på.
@@ -367,7 +376,7 @@ logoRaster:
     and #7
     cmp #2                  // linjen före en badline (yscroll = 3)?
     bne !next+
-    ldy #6                  // vänta till högerkanten
+    ldy #5                  // vänta till högerkanten
 !delay:
     dey
     bne !delay-
