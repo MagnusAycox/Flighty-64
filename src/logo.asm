@@ -32,9 +32,9 @@
 .const FLAG_CENTER = 24 + 8*LOGO_COL + 4 + 133
 // Rasterloopen börjar på linjen före logon. Tabellerna LOGO_LINES och
 // LOGO_D016 indexeras med rasterlinjen: post 0 = linje 58, 1-24 = logon,
-// 25 = linje 83 (första linjen under logon).
+// 25-26 = linje 83-84 (under logon).
 .const LOGO_RL0    = LOGO_LINE0-1
-.const LOGO_RLEND  = LOGO_LINE0+LOGO_H+1
+.const LOGO_RLEND  = LOGO_LINE0+LOGO_H+2   // loopen slutar efter linje 84
 
 // Bokstäverna som behövs, i den ordning de byggs
 logoLetters:
@@ -156,13 +156,15 @@ logoStart:
     dex
     bpl !loop-
     jsr drawLogo
-    lda #COL_BLACK          // linjen före och efter logon
+    lda #COL_BLACK          // linjen före och linjerna efter logon
     sta LOGO_LINES
     sta LOGO_LINES+LOGO_H+1
+    sta LOGO_LINES+LOGO_H+2
     lda #D016_HUD           // 38 kolumner döljer kanten som avslöjas
     sta LOGO_D016
     lda #D016_MENU          // resten av menyn: 40 kolumner, ingen scroll
     sta LOGO_D016+LOGO_H+1
+    sta LOGO_D016+LOGO_H+2
     lda #SPR_FLAGBAR
     sta SCREEN_A+$3f8
     lda #COL_YELLOW
@@ -325,18 +327,24 @@ logoUpdate:
     rts
 
 // -------------------------------------------------------------------
-// logoRaster: körs i raster-avbrottet på linje 55. Skriver $d021
-// (flaggans vågräta balk) och $d016 (bokstävernas våg) för varje
-// rasterlinje i logon, linje 58-83.
+// logoRaster: körs i raster-avbrottet på linje 55. Skriver $d016
+// (bokstävernas våg) och $d021 (flaggans vågräta balk) för varje
+// rasterlinje i logon, linje 58-84. (Uppmätt i VICE x64sc.)
 //
-// Vanliga linjer: värdena skrivs direkt när linjen börjar (cykel ca
-// 6-16), i vänsterkanten innan texten ritas. Texten börjar i kolumn 2,
-// och det som ligger före den är helt svart oavsett scroll och färg.
+// Vanliga linjer: värdena skrivs direkt när linjen börjar. $d016 först
+// (cykel ca 6-12): en ändring av finscrollen medan bilden ritas ger
+// lösa pixlar i bakgrundsfärgen, så den måste ske innan bildfönstret
+// börjar (cykel ca 16). $d021 hinner sedan till cykel ca 16; bakgrunden
+// syns inte förrän i bokstäverna, som börjar i kolumn 2.
 //
-// Badlines (första linjen i varje teckenrad: 59, 67, 75, 83) går inte:
-// där stoppas CPU:n från cykel ca 15 till 55. Värdena för en badline
-// skrivs därför i högerkanten på linjen före (cykel ca 61-71), och
-// loopen hoppar sedan över badlinen.
+// Badlines (första linjen i varje teckenrad: 59, 67, 75, 83): där står
+// CPU:n still från cykel ca 15 till 55, och loopen hinner inte ikapp
+// till linjen efter. Därför, på linjen före en badline:
+//   1. skriv linjens egna värden som vanligt,
+//   2. vänta till högerkanten och skriv badlinens värden,
+//   3. lägg fram värdena för linjen efter badlinen. Skrivningen hamnar
+//      efter stoppet, i badlinens högerkant (cykel ca 58-66),
+//   4. hoppa över båda linjerna.
 //
 // X = rasterlinjen, A/Y = färg/$d016 för den linje som väntas på.
 // -------------------------------------------------------------------
@@ -353,8 +361,8 @@ logoRaster:
 !wait:
     cpx $d012
     bne !wait-
-    sta $d021               // början av linjen
-    sty $d016
+    sty $d016               // början av linjen, före bildfönstret
+    sta $d021
     txa
     and #7
     cmp #2                  // linjen före en badline (yscroll = 3)?
@@ -365,9 +373,14 @@ logoRaster:
     bne !delay-
     lda LL+1,x              // badlinens värden
     ldy LD+1,x
-    sta $d021
     sty $d016
-    inx                     // hoppa över badlinen
+    sta $d021
+    inx                     // X = badlinen
+    lda LL+1,x              // linjen efter badlinen: CPU:n stoppas under
+    ldy LD+1,x              // de här instruktionerna, så skrivningen
+    sty $d016               // sker först i badlinens högerkant
+    sta $d021
+    inx
 !next:
     inx
     lda LL,x

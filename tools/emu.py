@@ -18,6 +18,10 @@ from py65.devices.mpu6502 import MPU
 
 CYCLES_PER_LINE = 63
 LINES = 312
+BA_CYCLE = 12     # badline: VIC-II tar bussen (BA låg) från cykel 12 ...
+BA_END = 55       # ... och CPU:n fortsätter vid cykel 55
+STORE_OPS = {0x85, 0x95, 0x8d, 0x9d, 0x99, 0x81, 0x91,   # sta
+             0x86, 0x96, 0x8e, 0x84, 0x94, 0x8c}          # stx, sty
 
 PALETTE = [
     (0, 0, 0), (255, 255, 255), (104, 55, 43), (112, 164, 178),
@@ -187,6 +191,15 @@ class C64:
             elif pc == self.wait_pc and self._busy_start is not None:
                 self.frame_busy.append(self.cycles - self._busy_start)
                 self._busy_start = None
+            if self._badline:
+                # Badline: CPU:n stannar vid första läscykeln från cykel 12
+                # (skrivcykler går igenom). En instruktion som skulle läsa
+                # där körs alltså klart först efter stoppet.
+                pos = self.cycles % CYCLES_PER_LINE
+                op = ram[pc]
+                last_read = pos + mpu.cycletime[op] - 1 - (1 if op in STORE_OPS else 0)
+                if last_read >= BA_CYCLE:
+                    self.badline_stall()
             before = mpu.processorCycles
             mpu.step()
             self.advance(mpu.processorCycles - before)
@@ -200,6 +213,15 @@ class C64:
     # bilden börjar. Skrivningar i vänsterkanten gäller alltså samma linje.
     SNAP_CYCLE = 16
 
+    def badline_stall(self):
+        # Registren för badlinen gäller som de var när CPU:n stannade
+        pos = self.cycles % CYCLES_PER_LINE
+        self._badline = False
+        if self._snap_pending:
+            self.snapshot_line()
+            self._snap_pending = False
+        self.cycles += max(0, BA_END - max(pos, BA_CYCLE))
+
     def advance(self, c):
         self.cycles += c
         new_line = (self.cycles // CYCLES_PER_LINE) % LINES
@@ -208,7 +230,7 @@ class C64:
                 self.snapshot_line()
             self.line = (self.line + 1) % LINES
             self._snap_pending = True
-            # badline: CPU:n stoppas ca 40 cykler från cykel 14
+            # badline: CPU:n stoppas från cykel 12 till 55 (se run_frame)
             yscroll = self.io[0x11] & 7
             self._badline = bool((self.io[0x11] & 0x10) and 0x30 <= self.line <= 0xf7
                                  and (self.line & 7) == yscroll)
@@ -216,11 +238,7 @@ class C64:
                 self.irq_latch |= 1
             new_line = (self.cycles // CYCLES_PER_LINE) % LINES
         if self._badline and self.cycles % CYCLES_PER_LINE >= 14:
-            self._badline = False
-            if self._snap_pending:
-                self.snapshot_line()
-                self._snap_pending = False
-            self.cycles += 40
+            self.badline_stall()        # t.ex. avbrott som börjar på en badline
         if self._snap_pending and self.cycles % CYCLES_PER_LINE >= self.SNAP_CYCLE:
             self.snapshot_line()
             self._snap_pending = False

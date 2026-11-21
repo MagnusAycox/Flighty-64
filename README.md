@@ -256,14 +256,17 @@ avbrottsvektorer på `$fffa-$ffff`.
   Tecknen är **inverterade**: förgrunden är svart runt bokstaven, och själva
   bokstaven är ett hål där bakgrundsfärgen `$d021` syns.
 * **Vågen i sidled:** raster-avbrottet på linje 55 kör en loop över
-  rasterlinjerna 58-83. För varje linje skriver den `$d016` (finscroll 0-7
+  rasterlinjerna 58-84. För varje linje skriver den `$d016` (finscroll 0-7
   pixlar ur `waveTab`) och `$d021` (blått eller gult). Fasen ökar 3 steg
   per linje och 1 steg per bildruta, så vågen vandrar. Logoraderna visas i
   38-kolumnsläge, så kanten som avslöjas när en linje flyttas döljs.
-* **Tidpunkten:** på vanliga linjer skrivs registren direkt när linjen
-  börjar (cykel ca 6-16), innan texten i kolumn 2 ritas. På en badline
-  (första linjen i varje teckenrad) står CPU:n still cykel ca 15-55, så
-  där skrivs värdena i stället i högerkanten på linjen före.
+* **Tidpunkten** (uppmätt i VICE): på vanliga linjer skrivs `$d016` först,
+  senast cykel 12. Ändras finscrollen medan bilden ritas blir det lösa
+  pixlar i bakgrundsfärgen. `$d021` kommer strax efter; bakgrunden syns
+  ändå inte förrän i bokstäverna. På en badline (första linjen i varje
+  teckenrad) står CPU:n still cykel ca 15-55. Badlinens värden skrivs
+  därför i högerkanten på linjen före, och värdena för linjen efter
+  badlinen skrivs i badlinens högerkant, direkt efter stoppet.
 * **Den vågräta gula balken:** vilka linjer som är gula läses ur
   `bounceTab`, som är en halv sinus (1 − |sin|): skarp vändning i
   nederkant, mjuk i överkant.
