@@ -292,7 +292,7 @@ class C64:
             for n in range(7, -1, -1):
                 if not en & (1 << n):
                     continue
-                sy = self.io[1 + n * 2]
+                sy = self.io[1 + n * 2] + 1    # VIC visar spriten från linjen efter y
                 dy = line - sy
                 yexp = self.io[0x17] & (1 << n)
                 if yexp:

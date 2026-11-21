@@ -190,6 +190,8 @@ tools/
   ka_subset.py    Liten assembler för den KickAss-syntax spelet använder (test)
   emu.py          Minimal C64-testmiljö (py65) för provkörning och skärmbilder
   smoke_test.py   Automatiskt test: meny -> nivå 1 (alla vågor) -> nivå 2 -> game over -> topplista
+  vice_test.py    Samma genomspelning i riktiga VICE via den binära monitorn
+  get_openroms.sh Hämtar fria C64-ROM:ar (MEGA65 Open ROMs) för VICE-testet
 build.sh          Bygger med KickAssembler
 ```
 
@@ -322,6 +324,31 @@ python3 tools/smoke_test.py
 använder, och `emu.py` emulerar bara det spelet behöver (CPU, raster-IRQ,
 joystick, teckenläge och sprites). Det ersätter inte ett test i VICE eller på
 riktig hårdvara.
+
+## Testa i VICE automatiskt
+
+`tools/vice_test.py` kör spelet i riktiga VICE (`x64sc`, cykelexakt) och styr
+det via VICE:s binära monitor. Skriptet stannar emulatorn en gång per
+bildruta, läser spelets minne, styr gubben med samma enkla "bot" som
+`smoke_test.py` och sparar skärmbilder direkt från VIC-II. Det spelar hela
+vägen: menyn, alla vågor, rymdskeppet, flygfasen, landningen och nivå 2.
+Det fungerar utan skärm; finns ingen startas en virtuell skärm (Xvfb).
+
+```sh
+sudo apt install vice xvfb      # eller motsvarande
+pip install pillow
+tools/get_openroms.sh           # fria ersättnings-ROM:ar (se nedan)
+python3 tools/vice_test.py --roms build/openroms
+# skärmbilder hamnar i build/vice/
+```
+
+VICE behöver C64:ans ROM:ar (KERNAL, BASIC, teckengenerator). Originalen är
+upphovsrättsskyddade och saknas i t.ex. Ubuntus VICE-paket. `get_openroms.sh`
+hämtar därför [MEGA65 Open ROMs](https://github.com/MEGA65/open-roms), som är
+fria (LGPL-3). Spelet stänger av KERNAL och BASIC direkt, så det enda som
+märks är att typsnittet (även logons bokstäver) ser lite annorlunda ut. Har
+du en vanlig VICE-installation med originalens ROM:ar kan du peka på dem i
+stället (se hjälptexten i skriptet).
 
 ## Begränsningar
 

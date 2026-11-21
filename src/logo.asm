@@ -151,7 +151,7 @@ logoStart:
     sta SCREEN_A+$3f8
     lda #COL_YELLOW
     sta $d027
-    lda #LOGO_LINE0
+    lda #LOGO_LINE0-1       // spriten börjar på linjen efter sitt y-värde
     sta $d001
     lda #$01
     sta $d017               // höjdförstorad
