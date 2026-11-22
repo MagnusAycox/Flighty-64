@@ -36,6 +36,11 @@ flagga: det gula korsets vågräta balk studsar upp och ner som en boll
 (skarp vändning i nederkant, mjuk i överkant), och den lodräta balken glider
 långsamt höger–vänster (ett varv tar ca 20 sekunder).
 
+Under spelets titel rullar en text från höger till vänster. Den börjar med
+upphovsmännen, **BY RON, WHITE KNIGHT & BEAST**, och fortsätter med en hälsning
+om att spelet gjordes för att fira SOS 40-årsjubileum. Texten står i
+`scrollText` i `src/menu.asm`.
+
 Menyn visar de **10 bästa resultaten** (namn och poäng). Det senast
 inskrivna resultatet visas i gult. Starta en omgång med **FIRE**.
 
@@ -277,6 +282,9 @@ avbrottsvektorer på `$fffa-$ffff`.
   Dess x-position följer en vanlig sinus, så den vänder mjukt i båda
   ändarna. `flagXTab` är en kvarts period (256 steg, hela pixlar) som koden
   speglar till ett helt varv på 1024 bildrutor, ca 1 pixel per bildruta.
+* **Rulltexten** på rad 6 har egen finscroll: samma rasterloop sätter `$d016`
+  i början av rasterlinje 99 och återställer den på linje 107. Raden visas i
+  38-kolumnsläge, så tecknen glider in och ut under ramen.
 * Höjd- och sidledsrörelsen har olika hastighet, så flaggan rör sig som en
   boll som studsar runt.
 

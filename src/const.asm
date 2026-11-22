@@ -241,6 +241,9 @@
 .const flagPhase   = $93          // lodräta balken: steg 0-255 i en kvartsperiod
 .const flagQuad    = $94          // ... och vilken kvartsperiod (0-3)
 .const bouncePhase = $97
+.const scrollFine  = $98          // rulltextens finscroll 0-7
+.const scrollPtr   = $99          // 2 byte: nästa tecken i rulltexten
+.const scrollD016  = $9b          // $d016 för rulltextens rad
 .const LOGO_LINES  = $c180        // 27 byte: $d021 per rasterlinje, linje 58-84
 .const LOGO_D016   = $c1a0        // 27 byte: $d016 per rasterlinje, linje 58-84
 .const sprX        = $68          // 8 byte

@@ -12,7 +12,8 @@ menuText:
     .byte 5, 10, COL_YELLOW
     .text "F L I G H T Y   6 4"
     .byte 0
-    .byte 7, 11, COL_WHITE
+    // rad 6: rulltexten (scrollText nedan)
+    .byte 8, 11, COL_WHITE
     .text "TOP 10 HIGH SCORES"
     .byte 0
     .byte 20, 10, COL_LIGHT_GREEN
@@ -59,11 +60,13 @@ showMenu:
     ldx #>menuText
     jsr printList
     jsr printHighscores
+    jsr scrollStart
     jmp logoStart
 
 // Färgcykling på titeln och blinkande "PRESS FIRE"
 menuAnimate:
     jsr logoUpdate
+    jsr scrollUpdate
     inc menuTimer
     lda menuTimer
     and #3
@@ -219,3 +222,81 @@ startGameOver:
     lda #<gameOverText
     ldx #>gameOverText
     jmp printList
+
+// -------------------------------------------------------------------
+// Rulltext på rad 6. Texten rullar mjukt från höger till vänster
+// (finscroll i $d016 för just den raden, se logoRaster) och börjar om
+// när den tar slut.
+// -------------------------------------------------------------------
+.const SCROLL_ROW    = 6
+.const SCROLL_LINE0  = 51 + 8*SCROLL_ROW  // första rasterlinjen (99)
+.const SCROLL_SPEED  = 2                  // pixlar per bildruta
+
+scrollText:
+    .text "BY RON, WHITE KNIGHT & BEAST   ***   "
+    .text "THIS GAME WAS CREATED TO CELEBRATE OUR SOS 40 YEAR ANNIVERSARY. "
+    .text "WE HAD A MEETUP IN THE OFFICE OF BEAST. "
+    .text "SNACKS, BEVERAGES, STORIES, ANECDOTES AND FUN. "
+    .text "LOVE THOSE GUYS. "
+    .text "IT BOGGLES THE MIND THAT WE HAVE BEEN HACKING AWAY "
+    .text "ON THE TRUSTY OL' 64 FOR 40 YEARS. "
+    .text "SO MANY FRIENDS HAVE COME AND GONE WHILE MANY HAVE "
+    .text "REMAINED LIFELONG FRIENDS.   ***   "
+    .text "                                        "
+    .byte 0
+
+scrollStart:
+    lda #<scrollText
+    sta scrollPtr
+    lda #>scrollText
+    sta scrollPtr+1
+    lda #7
+    sta scrollFine
+    ora #D016_HUD
+    sta scrollD016
+    ldx #39
+!loop:
+    lda #32
+    sta SCREEN_A + SCROLL_ROW*40,x
+    lda #COL_CYAN
+    sta COLORRAM + SCROLL_ROW*40,x
+    dex
+    bpl !loop-
+    rts
+
+// En gång per bildruta i menyn (i vblank)
+scrollUpdate:
+    lda scrollFine
+    sec
+    sbc #SCROLL_SPEED
+    bcs !keep+
+    adc #8                  // carry är 0 här
+    sta scrollFine
+    ldx #0                  // flytta raden ett tecken åt vänster
+!shift:
+    lda SCREEN_A + SCROLL_ROW*40+1,x
+    sta SCREEN_A + SCROLL_ROW*40,x
+    inx
+    cpx #39
+    bne !shift-
+    ldy #0                  // nytt tecken längst till höger
+    lda (scrollPtr),y
+    bne !put+
+    lda #<scrollText        // slut på texten: börja om
+    sta scrollPtr
+    lda #>scrollText
+    sta scrollPtr+1
+    lda (scrollPtr),y
+!put:
+    sta SCREEN_A + SCROLL_ROW*40+39
+    inc scrollPtr
+    bne !done+
+    inc scrollPtr+1
+    jmp !done+
+!keep:
+    sta scrollFine
+!done:
+    lda scrollFine
+    ora #D016_HUD           // 38 kolumner: in- och utgående tecken döljs
+    sta scrollD016
+    rts

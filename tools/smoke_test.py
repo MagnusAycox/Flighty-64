@@ -94,6 +94,7 @@ def main():
     # glider långsamt (ett varv = 1024 bildrutor)
     wave = c.ram[addr(c, 'waveTab'):addr(c, 'waveTab') + 64]
     bars = set()
+    row6 = []
     sprite_x = []
     gif = []
     for f in range(1024):
@@ -109,12 +110,19 @@ def main():
         xs = [v & 7 for v in d016]
         assert any(all(xs[i] == wave[(p + 3 * i) & 63] for i in range(24)) for p in range(64)),             "bokstäverna följer inte sinusvågen: %s" % xs
         assert c.line_regs[83][1] == 0x08, "menyn under logon ska ha 40 kolumner utan scroll"
+        # rulltexten på rad 6 (rasterlinje 99-106) har egen finscroll
+        d016 = [c.line_regs[line][1] & 0x1f for line in range(97, 109)]
+        assert d016[0] == d016[1] == 0x08 and d016[-1] == 0x08, "fel $d016 runt rulltexten: %s" % d016
+        assert len(set(d016[2:10])) == 1 and d016[2] < 8, "rulltextens $d016 ska vara 38 kolumner + finscroll: %s" % d016
+        row6.append(bytes(c.ram[addr(c, 'SCREEN_A') + 240: addr(c, 'SCREEN_A') + 280]))
         sprite_x.append(c.io[0] | ((c.io[0x10] & 1) << 8))
         if shots and f < 128 and f % 2 == 0:
             from PIL import Image
             c.render(os.path.join(shots, '.frame.png'), scale=1)
             gif.append(Image.open(os.path.join(shots, '.frame.png')).crop((32, 24, 352, 104)).convert('P'))
     assert c.io[0x1b] & 1 and c.io[0x17] & 1, "flaggbalken ska vara höjdförstorad och bakom texten"
+    assert len(set(row6)) > 20, "rulltexten rör sig inte"
+    assert any(b'\x02\x19\x20\x12\x0f\x0e' in r for r in row6), "krediten syns inte i rulltexten"
     assert min(bars) == 0 and max(bars) == 19, "balken studsar inte hela vägen: %s" % sorted(bars)
     steps = [abs(a - b) for a, b in zip(sprite_x, sprite_x[1:])]
     assert max(steps) <= 1, "lodräta balken ska gå långsamt (max %d px/bildruta)" % max(steps)

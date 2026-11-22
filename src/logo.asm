@@ -396,4 +396,19 @@ logoRaster:
     ldy LD,x
     cpx #LOGO_RLEND
     bne !line-
+
+    // Rulltexten på rad 6: egen finscroll för just de 8 rasterlinjerna.
+    // Skrivningarna görs i början av linjen (i vänsterkanten).
+    ldy #SCROLL_LINE0
+    lda scrollD016
+!wait:
+    cpy $d012
+    bne !wait-
+    sta $d016
+    ldy #SCROLL_LINE0+8
+    lda #D016_MENU
+!wait:
+    cpy $d012
+    bne !wait-
+    sta $d016
     rts
