@@ -283,8 +283,9 @@ avbrottsvektorer på `$fffa-$ffff`.
   ändarna. `flagXTab` är en kvarts period (256 steg, hela pixlar) som koden
   speglar till ett helt varv på 1024 bildrutor, ca 1 pixel per bildruta.
 * **Rulltexten** på rad 6 har egen finscroll: samma rasterloop sätter `$d016`
-  i början av rasterlinje 99 och återställer den på linje 107. Raden visas i
-  38-kolumnsläge, så tecknen glider in och ut under ramen.
+  för rasterlinje 99-106 och återställer den på linje 107. Båda är badlines,
+  så värdena skrivs i högerkanten på linjen före (`d016AtLineEnd`). Raden
+  visas i 38-kolumnsläge, så tecknen glider in och ut under ramen.
 * Höjd- och sidledsrörelsen har olika hastighet, så flaggan rör sig som en
   boll som studsar runt.
 

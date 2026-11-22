@@ -398,17 +398,31 @@ logoRaster:
     bne !line-
 
     // Rulltexten på rad 6: egen finscroll för just de 8 rasterlinjerna.
-    // Skrivningarna görs i början av linjen (i vänsterkanten).
-    ldy #SCROLL_LINE0
+    // Radens första linje (99) och linjen efter (107) är badlines, så
+    // värdena skrivs i högerkanten på linjen före, som för logon.
+    ldx #SCROLL_LINE0-1
     lda scrollD016
-!wait:
-    cpy $d012
-    bne !wait-
-    sta $d016
-    ldy #SCROLL_LINE0+8
+    jsr d016AtLineEnd
+    ldx #SCROLL_LINE0+8-1
     lda #D016_MENU
+    // (fortsätter i d016AtLineEnd)
+
+// -------------------------------------------------------------------
+// d016AtLineEnd: vänta på rasterlinje X och skriv A till $d016 i
+// högerkanten, efter bildfönstret men före nästa linjes badline-stopp
+// (CPU:n stannar vid första läsning från cykel 12). Uppmätt i VICE:
+// skrivningen sker i cykel ca 59-66 (sprite 0:s DMA i slutet av
+// linjen kan skjuta den några cykler). Marginal ca 5 cykler åt båda
+// hållen.
+// -------------------------------------------------------------------
+d016AtLineEnd:
 !wait:
-    cpy $d012
+    cpx $d012
     bne !wait-
+    ldy #10
+!delay:
+    dey
+    bne !delay-
+    nop
     sta $d016
     rts
