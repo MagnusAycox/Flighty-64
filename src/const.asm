@@ -243,6 +243,9 @@
 .const swayPhase   = $95
 .const flagPhase   = $96
 .const bouncePhase = $97
+.const scrollFine  = $98          // rulltextens finscroll 0-7
+.const scrollPtr   = $99          // 2 byte: nästa tecken i rulltexten
+.const scrollD016  = $9b          // $d016 för rulltextens rad
 .const LOGO_LINES  = $c180        // 25 byte: $d021 per rasterlinje i logon
 .const sprX        = $68          // 8 byte
 .const sprY        = $70          // 8 byte

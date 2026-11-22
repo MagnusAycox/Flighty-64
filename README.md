@@ -35,7 +35,10 @@ studsar: det gula korsets vågräta balk studsar upp och ner som en boll
 (skarp vändning i nederkant, mjuk i överkant), och den lodräta balken glider
 höger–vänster.
 
-Under spelets titel står upphovsmännen: **BY RON, WHITE KNIGHT & BEAST**.
+Under spelets titel rullar en text från höger till vänster. Den börjar med
+upphovsmännen, **BY RON, WHITE KNIGHT & BEAST**, och fortsätter med en hälsning
+om att spelet gjordes för att fira SOS 40-årsjubileum. Texten står i
+`scrollText` i `src/menu.asm`.
 
 Menyn visar de **10 bästa resultaten** (namn och poäng). Det senast
 inskrivna resultatet visas i gult. Starta en omgång med **FIRE**.
@@ -268,6 +271,9 @@ avbrottsvektorer på `$fffa-$ffff`.
   *bakom* förgrunden (`$d01b`). Den syns därför bara genom bokstavshålen.
   Dess x-position följer en vanlig sinus (`flagXTab`), så den vänder mjukt
   i båda ändarna.
+* **Rulltexten** på rad 6 har egen finscroll: samma rasterloop sätter `$d016`
+  i början av rasterlinje 99 och återställer den på linje 107. Raden visas i
+  38-kolumnsläge, så tecknen glider in och ut under ramen.
 * Höjd- och sidledsrörelsen har olika hastighet, så flaggan rör sig som en
   boll som studsar runt.
 
