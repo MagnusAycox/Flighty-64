@@ -35,6 +35,8 @@ studsar: det gula korsets vågräta balk studsar upp och ner som en boll
 (skarp vändning i nederkant, mjuk i överkant), och den lodräta balken glider
 höger–vänster.
 
+Under spelets titel står upphovsmännen: **BY RON, WHITE KNIGHT & BEAST**.
+
 Menyn visar de **10 bästa resultaten** (namn och poäng). Det senast
 inskrivna resultatet visas i gult. Starta en omgång med **FIRE**.
 

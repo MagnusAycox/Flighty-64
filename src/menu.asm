@@ -12,7 +12,10 @@ menuText:
     .byte 5, 10, COL_YELLOW
     .text "F L I G H T Y   6 4"
     .byte 0
-    .byte 7, 11, COL_WHITE
+    .byte 6, 6, COL_CYAN
+    .text "BY RON, WHITE KNIGHT & BEAST"
+    .byte 0
+    .byte 8, 11, COL_WHITE
     .text "TOP 10 HIGH SCORES"
     .byte 0
     .byte 20, 10, COL_LIGHT_GREEN
