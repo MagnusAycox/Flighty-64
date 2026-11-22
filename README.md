@@ -37,7 +37,7 @@ flagga: det gula korsets vågräta balk studsar upp och ner som en boll
 långsamt höger–vänster (ett varv tar ca 20 sekunder).
 
 Under spelets titel rullar en text från höger till vänster. Den börjar med
-upphovsmännen, **BY RON, WHITE KNIGHT & BEAST**, och fortsätter med en hälsning
+upphovsmännen, **BY RON, WHITE KNIGHT, BEAST & WOLK**, och fortsätter med en hälsning
 om att spelet gjordes för att fira SOS 40-årsjubileum. Texten står i
 `scrollText` i `src/menu.asm`.
 
@@ -171,6 +171,20 @@ Programmet startar med en BASIC-rad (`10 SYS 2061`), så på en riktig C64 räck
 `LOAD"FLIGHTY64",8,1` följt av `RUN`.
 
 Spelet är gjort för PAL-maskiner (50 Hz).
+
+### Jämn rulltext och scrollning i VICE
+
+En PAL-C64 ritar 50 bilder per sekund. På en skärm med 60 Hz måste VICE
+visa var femte bild två gånger, och då ser rulltexten och grottan hackiga
+ut, fast spelet flyttar dem exakt lika långt varje bildruta. Två sätt att
+få det jämnt:
+
+* **Ställ skärmen på 50 Hz** (i Windows skärminställningar, om skärmen
+  klarar det) och kör VICE med vsync: `x64sc -VICIIvsync -autostart ...`.
+  Varje bild visas då exakt en gång, i rätt takt.
+* **Kör VICE i 60 bilder per sekund:** `x64sc -speed -60 -VICIIvsync
+  -autostart build/flighty64.prg`. Rörelsen blir helt jämn på en 60 Hz-skärm,
+  men allt går 20 % fortare (även ljudet).
 
 ---
 

@@ -233,9 +233,9 @@ startGameOver:
 .const SCROLL_SPEED  = 2                  // pixlar per bildruta
 
 scrollText:
-    .text "BY RON, WHITE KNIGHT & BEAST   ***   "
+    .text "BY RON, WHITE KNIGHT, BEAST & WOLK   ***   "
     .text "THIS GAME WAS CREATED TO CELEBRATE OUR SOS 40 YEAR ANNIVERSARY. "
-    .text "WE HAD A MEETUP IN THE OFFICE OF BEAST. "
+    .text "WE HAD A MEETUP IN BEAST'S OFFICE. "
     .text "SNACKS, BEVERAGES, STORIES, ANECDOTES AND FUN. "
     .text "LOVE THOSE GUYS. "
     .text "IT BOGGLES THE MIND THAT WE HAVE BEEN HACKING AWAY "
