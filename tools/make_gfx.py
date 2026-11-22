@@ -33,8 +33,13 @@ FIRST_CHAR = 64               # egna tecken: 64 och uppåt
 LOGO_WIDTH = 272              # "SOFTWARE OF SWEDEN": 16 bokstäver x 16 px + 2 mellanslag x 8 px
 LOGO_WAVE = 7                 # bokstävernas våg: 0-7 pixlar (finscroll per rasterlinje)
 FLAG_BAR_W = 6
-FLAG_HALF = (LOGO_WIDTH - FLAG_BAR_W) // 2    # lodräta balken: ± så här långt från mitten
-BOUNCE = 19                   # 24 rader hög logo - 5 rader balk
+LOGO_ROWS = 24                # logons höjd i rasterlinjer
+FLAG_BAR_H = 5                # vågräta balkens normala tjocklek
+FLOOR = LOGO_ROWS - FLAG_BAR_H  # balkens översta rad när den ligger på golvet (19)
+# Studsarna: höjd i rader över golvet. Bollen tappar fart för varje studs
+# och får sedan en ny knuff (som när man dribblar en basketboll).
+BOUNCES = [19, 13, 8, 4]
+BOUNCE_T19 = 46               # bildrutor i luften för den högsta studsen
 
 SPR_MAP = {'.': 0, 'w': 1, 'b': 2, 's': 3}
 CHR_MAP = {'.': 0, 'r': 1, 'd': 2, 'g': 3}
@@ -312,6 +317,8 @@ SPRITES = [
 # Flaggans lodräta gula balk på startskärmen. Hires-sprite: 'sss' = 6 pixlar.
 # Bara 12 rader data; med höjdförstoring blir den exakt 24 rader hög.
 SPRITES.append(("FLAGBAR", "top", ["sss........."] * 12))
+# Samma balk ihoptryckt mot en vägg: 4 pixlar bred
+SPRITES.append(("FLAGBAR4", "top", ["ss.........."] * 12))
 
 # Spegelvända gubbar (springer åt vänster)
 _by_name = {n: (a, r) for n, a, r in SPRITES}
@@ -464,6 +471,28 @@ def fmt_bytes(vals, per_line=12):
     return lines
 
 
+def bounce_frames():
+    """Flaggans vågräta balk bildruta för bildruta: (översta rad, tjocklek)."""
+    tops, heights = [], []
+    for h in BOUNCES:
+        t_air = int(round(BOUNCE_T19 * math.sqrt(h / 19.0)))
+        # golvkontakt: ihoptryckt, sedan på väg tillbaka
+        tops += [LOGO_ROWS - 3, LOGO_ROWS - 4]
+        heights += [3, 4]
+        for t in range(1, t_air):
+            y = h * (1 - (2.0 * t / t_air - 1) ** 2)       # parabel, 0 vid golvet
+            top = FLOOR - int(round(y))
+            if y < 0.3 * h and top >= 1:                    # snabbt nära golvet: utsträckt
+                tops.append(top - 1)
+                heights.append(FLAG_BAR_H + 1)
+            else:
+                tops.append(top)
+                heights.append(FLAG_BAR_H)
+    assert len(tops) < 256
+    assert all(0 <= t and t + hh <= LOGO_ROWS for t, hh in zip(tops, heights))
+    return tops, heights
+
+
 def main():
     padded = {}
     for name, align, rows in SPRITES:
@@ -482,6 +511,7 @@ def main():
         const.append(".const CH_%-8s = %d" % (name, FIRST_CHAR + i))
     const.append("")
     const.append(".const GFX_CHARS_LEN   = %d" % (len(CHARS) * 8))
+    const.append(".const BOUNCE_LEN      = %d   // bildrutor i flaggans studsserie" % len(bounce_frames()[0]))
     const.append(".const GFX_SPRITES_LEN = %d" % (len(SPRITES) * 64))
     const.append("")
     const.append("// Kollisionsboxar i spritepixlar (inklusive), union av alla ramar")
@@ -538,16 +568,18 @@ def main():
     data.append("waveTab:")
     data += fmt_bytes([int(round(LOGO_WAVE / 2 * (1 + math.sin(2 * math.pi * i / 64))))
                        for i in range(64)], 16)
-    data.append("// Flaggans lodräta balk: avstånd 0-%d px från mitten, en kvarts sinusperiod." % FLAG_HALF)
-    data.append("// Koden speglar den till en hel period (mjuka vändningar).")
-    data.append("flagXTab:")
-    data += fmt_bytes([int(round(FLAG_HALF * math.sin(math.pi / 2 * (i + 0.5) / 256)))
-                       for i in range(256)], 16)
-    data.append("// Flaggans vågräta balk: översta raden 0-%d. Halv sinus (|sin|):" % BOUNCE)
-    data.append("// skarp vändning i nederkant, mjuk i överkant")
-    data.append("bounceTab:")
-    data += fmt_bytes([int(round(BOUNCE * (1 - math.sin(math.pi * i / 256))))
-                       for i in range(256)], 16)
+    # Flaggans vågräta balk: en serie parabelstudsar (konstant tyngdkraft).
+    # Per bildruta: översta raden och tjockleken. I golvkontakten trycks
+    # balken ihop (3 och 4 rader), nära golvet där farten är hög sträcks den
+    # ut till 6 rader. Tiden i luften växer med roten ur höjden.
+    tops, heights = bounce_frames()
+    data.append("// Flaggans vågräta balk: %d bildrutor, %d studsar (höjd %s rader)." % (
+        len(tops), len(BOUNCES), ", ".join(map(str, BOUNCES))))
+    data.append("// bounceTop = översta raden 0-23, bounceH = tjocklek i rader")
+    data.append("bounceTop:")
+    data += fmt_bytes(tops, 16)
+    data.append("bounceH:")
+    data += fmt_bytes(heights, 16)
     data.append("")
 
     with open(os.path.join(SRC, "gfx_const.asm"), "w", encoding="utf-8") as f:

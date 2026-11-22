@@ -90,10 +90,13 @@ def main():
         c.render(os.path.join(shots, 'menu.png'))
 
     # startskärmens logo: blå/gul flagga i logons rasterlinjer, svart utanför,
-    # bokstäverna böljar (egen finscroll per rasterlinje), lodräta balken
-    # glider långsamt (ett varv = 1024 bildrutor)
+    # bokstäverna böljar (egen finscroll per rasterlinje). Korset studsar:
+    # vågräta balken mellan topp och golv (ihoptryckt vid golvet), lodräta
+    # balken med jämn fart mellan väggarna (ihoptryckt vid väggen)
     wave = c.ram[addr(c, 'waveTab'):addr(c, 'waveTab') + 64]
-    bars = set()
+    sym_spr = addr(c, 'SPR_FLAGBAR4')
+    bars = []
+    sprite_ptr = []
     row6 = []
     sprite_x = []
     gif = []
@@ -103,8 +106,9 @@ def main():
         assert d021[:4] == [0] * 4 and d021[-4:] == [0] * 4, "färgbyte utanför logon: %s" % d021
         inside = d021[4:28]
         assert set(inside) == {6, 7}, "logon ska ha blå och gul: %s" % inside
-        assert inside.count(7) == 5, "vågräta balken ska vara 5 rader"
-        bars.add(inside.index(7))
+        top, n = inside.index(7), inside.count(7)
+        assert 3 <= n <= 6 and inside[top:top + n] == [7] * n, "vågräta balken ska vara 3-6 rader i ett stycke: %s" % inside
+        bars.append((top, n))
         d016 = [c.line_regs[line][1] for line in range(59, 83)]
         assert all(v & 0xf8 == 0 for v in d016), "logon ska vara 38 kolumner: %s" % d016
         xs = [v & 7 for v in d016]
@@ -116,19 +120,33 @@ def main():
         assert len(set(d016[2:10])) == 1 and d016[2] < 8, "rulltextens $d016 ska vara 38 kolumner + finscroll: %s" % d016
         row6.append(bytes(c.ram[addr(c, 'SCREEN_A') + 240: addr(c, 'SCREEN_A') + 280]))
         sprite_x.append(c.io[0] | ((c.io[0x10] & 1) << 8))
-        if shots and f < 128 and f % 2 == 0:
+        sprite_ptr.append(c.ram[addr(c, 'SCREEN_A') + 0x3f8])
+        if shots and f < 300 and f % 2 == 0:
             from PIL import Image
             c.render(os.path.join(shots, '.frame.png'), scale=1)
             gif.append(Image.open(os.path.join(shots, '.frame.png')).crop((32, 24, 352, 104)).convert('P'))
     assert c.io[0x1b] & 1 and c.io[0x17] & 1, "flaggbalken ska vara höjdförstorad och bakom texten"
     assert len(set(row6)) > 20, "rulltexten rör sig inte"
     assert any(b'\x02\x19\x20\x12\x0f\x0e' in r for r in row6), "krediten syns inte i rulltexten"
-    assert min(bars) == 0 and max(bars) == 19, "balken studsar inte hela vägen: %s" % sorted(bars)
-    steps = [abs(a - b) for a, b in zip(sprite_x, sprite_x[1:])]
-    assert max(steps) <= 1, "lodräta balken ska gå långsamt (max %d px/bildruta)" % max(steps)
+    assert min(t for t, _ in bars) == 0, "balken studsar inte ända upp"
+    floor = [(t, n) for t, n in bars if t + n == 24]
+    assert any(n == 3 for _, n in floor), "balken trycks inte ihop mot golvet"
+    assert sum(1 for t, n in bars if (t, n) == (21, 3)) >= 7, "för få studsar mot golvet"
+    # ihoptryckt är balken 4 px bred, annars 6. Kanten mot väggen ligger
+    # kvar, så minst en av kanterna flyttar högst 1 px per bildruta.
+    right = [x + (4 if p == sym_spr else 6) for x, p in zip(sprite_x, sprite_ptr)]
+    for i in range(len(sprite_x) - 1):
+        assert min(abs(sprite_x[i + 1] - sprite_x[i]), abs(right[i + 1] - right[i])) <= 1,             "lodräta balken hoppar vid bildruta %d" % i
+    steps = [b - a for a, b in zip(sprite_x, sprite_x[1:])]
     assert max(sprite_x) - min(sprite_x) > 260, "lodräta balken rör sig inte över hela texten"
-    print("logo: vågrät balk rad %d-%d, lodrät balk x %d-%d (max %d px/bildruta)" % (
-        min(bars), max(bars), min(sprite_x), max(sprite_x), max(steps)))
+    # vändningar bara vid väggarna, och där är balken ihoptryckt
+    moving = [d for d in steps if d]
+    turns = [i for i, (a, b) in enumerate(zip(moving, moving[1:])) if (a > 0) != (b > 0)]
+    assert len(turns) >= 3, "lodräta balken studsar inte mellan väggarna"
+    squashed = {x for x, p in zip(sprite_x, sprite_ptr) if p == sym_spr}
+    assert squashed and all(x in (min(sprite_x), max(sprite_x)) for x in squashed),         "lodräta balken ska bara tryckas ihop vid väggarna: %s" % sorted(squashed)
+    print("logo: vågrät balk rad 0-23 (%d golvstudsar), lodrät balk x %d-%d, %d väggstudsar" % (
+        sum(1 for b in bars if b == (21, 3)), min(sprite_x), max(sprite_x), len(turns)))
     if shots:
         os.remove(os.path.join(shots, '.frame.png'))
         gif = [im.resize((640, 160)) for im in gif]

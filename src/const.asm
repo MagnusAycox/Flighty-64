@@ -238,9 +238,11 @@
 .const irqTopLine  = $90          // rasterlinje för det övre avbrottet
 .const logoOn      = $91          // 1 = startskärmens logo-raster körs
 .const wavePhase   = $92          // bokstävernas sinusvåg
-.const flagPhase   = $93          // lodräta balken: steg 0-255 i en kvartsperiod
-.const flagQuad    = $94          // ... och vilken kvartsperiod (0-3)
-.const bouncePhase = $97
+.const flagXLo     = $93          // lodräta balkens x (vänsterkant), 16 bitar
+.const flagXHi     = $94
+.const flagDir     = $95          // 0 = åt höger, 1 = åt vänster
+.const flagSquash  = $96          // > 0: ihoptryckt mot väggen
+.const bouncePhase = $97          // bildruta i studsserien (bounceTop/bounceH)
 .const scrollFine  = $98          // rulltextens finscroll 0-7
 .const scrollPtr   = $99          // 2 byte: nästa tecken i rulltexten
 .const scrollD016  = $9b          // $d016 för rulltextens rad

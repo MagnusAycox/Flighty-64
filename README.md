@@ -32,9 +32,11 @@ Använd en joystick i **port 2**.
 Överst står **SOFTWARE OF SWEDEN** i stora bokstäver. Bokstäverna böljar i
 sidled: varje rasterlinje är förskjuten lite olika, så textens vänsterkant
 bildar en sinuskurva som vandrar uppåt. Genom bokstäverna syns en svensk
-flagga: det gula korsets vågräta balk studsar upp och ner som en boll
-(skarp vändning i nederkant, mjuk i överkant), och den lodräta balken glider
-långsamt höger–vänster (ett varv tar ca 20 sekunder).
+flagga vars gula kors rör sig som en studsande basketboll sedd från sidan.
+Den vågräta balken faller och studsar mot golvet i allt lägre studsar,
+trycks ihop i varje nedslag och får sedan en ny knuff, som när man
+dribblar. Den lodräta balken går med jämn fart i sidled och studsar
+tvärt mot textens kanter, som mot en vägg, och trycks ihop där.
 
 Under spelets titel rullar en text från höger till vänster. Den börjar med
 upphovsmännen, **BY RON, WHITE KNIGHT, BEAST & WOLK**, och fortsätter med en hälsning
@@ -289,19 +291,23 @@ avbrottsvektorer på `$fffa-$ffff`.
   badlinen förra linjens färg), och värdena för linjen efter badlinen
   skrivs i badlinens högerkant, direkt efter stoppet.
 * **Den vågräta gula balken:** vilka linjer som är gula läses ur
-  `bounceTab`, som är en halv sinus (1 − |sin|): skarp vändning i
-  nederkant, mjuk i överkant.
+  `bounceTop` (översta raden) och `bounceH` (tjockleken), en bildruta i
+  taget. Tabellerna räknas ut i `tools/make_gfx.py`: fyra parabelstudsar
+  (konstant tyngdkraft) med höjden 19, 13, 8 och 4 rader, där tiden i
+  luften växer med roten ur höjden. I golvkontakten är balken 3 och sedan
+  4 rader tjock (ihoptryckt), nära golvet där farten är hög 6 rader
+  (utsträckt), annars 5. Serien är 139 bildrutor (ca 2,8 s) och börjar om.
 * **Den lodräta gula balken** är sprite 0, höjdförstorad och placerad
   *bakom* förgrunden (`$d01b`). Den syns därför bara genom bokstavshålen.
-  Dess x-position följer en vanlig sinus, så den vänder mjukt i båda
-  ändarna. `flagXTab` är en kvarts period (256 steg, hela pixlar) som koden
-  speglar till ett helt varv på 1024 bildrutor, ca 1 pixel per bildruta.
+  Den går 1 pixel per bildruta och vänder tvärt vid textens kanter. Vid
+  väggen står den still i 3 bildrutor som en smalare sprite (4 pixlar i
+  stället för 6, `SPR_FLAGBAR4`) med kanten kvar mot väggen.
 * **Rulltexten** på rad 6 har egen finscroll: samma rasterloop sätter `$d016`
   för rasterlinje 99-106 och återställer den på linje 107. Båda är badlines,
   så värdena skrivs i högerkanten på linjen före (`d016AtLineEnd`). Raden
   visas i 38-kolumnsläge, så tecknen glider in och ut under ramen.
-* Höjd- och sidledsrörelsen har olika hastighet, så flaggan rör sig som en
-  boll som studsar runt.
+* Tillsammans blir rörelserna en bollbana: bågar mellan golvet och
+  väggarna. Ett varv fram och tillbaka tar ca 11 sekunder.
 
 ### Grottgeneratorn
 

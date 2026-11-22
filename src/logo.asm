@@ -6,13 +6,17 @@
 //    så bokstaven är ett "hål" där bakgrundsfärgen ($d021) syns.
 //  * Bokstäverna böljar i sidled: varje rasterlinje får en egen finscroll
 //    ($d016), så vänsterkanten följer en sinuskurva som vandrar uppåt.
-//  * Genom hålen syns en svensk flagga som studsar:
+//  * Genom hålen syns en svensk flagga. Korset rör sig som en boll sedd
+//    från sidan, som studsar mot golvet och mot väggarna:
 //      - den vågräta gula balken = $d021 byts till gult på några
-//        rasterlinjer. Den studsar i en halv sinus (|sin|): skarp
-//        vändning i nederkant, mjuk i överkant.
+//        rasterlinjer. Den följer parabler (konstant tyngdkraft) i en
+//        serie studsar som blir lägre och sedan får en ny knuff, som en
+//        dribblad basketboll (bounceTop/bounceH). I golvkontakten trycks
+//        balken ihop, nära golvet sträcks den ut.
 //      - den lodräta gula balken = sprite 0 bakom förgrunden ($d01b),
-//        så den syns bara genom bokstäverna. Den glider långsamt
-//        höger-vänster med vanlig sinus (mjuka vändningar).
+//        så den syns bara genom bokstäverna. Den går med jämn fart i
+//        sidled och vänder tvärt vid textens kanter, som mot en vägg.
+//        Vid väggen trycks den ihop (smalare sprite) några bildrutor.
 // ===================================================================
 
 .encoding "screencode_upper"
@@ -24,12 +28,13 @@
 .const LOGO_SOLID  = 188          // helt svart tecken runt texten
 .const LOGO_LEN    = 18           // tecken i texten
 .const NUM_LOGO_LETTERS = 10
-.const FLAG_BAR_H  = 5            // vågräta balkens höjd i rader (lodräta: 6 px)
 .const LOGO_COL    = 2            // textens första kolumn
 .const WAVE_STEP   = 3            // vågens fas per rasterlinje (64 = en period)
-// Lodräta balkens mittläge (sprite-x): textens vänsterkant (kolumn + halva
-// vågen) + halva vägen balken kan röra sig inom texten
-.const FLAG_CENTER = 24 + 8*LOGO_COL + 4 + 133
+// Lodräta balkens väggar (sprite-x för balkens vänsterkant): textens
+// vänsterkant (kolumn + halva vågen) och 272-6 pixlar längre åt höger
+.const FLAG_XMIN   = 24 + 8*LOGO_COL + 4
+.const FLAG_XMAX   = FLAG_XMIN + 266
+.const FLAG_SQUASH = 3            // bildrutor ihoptryckt mot väggen
 // Rasterloopen börjar på linjen före logon. Tabellerna LOGO_LINES och
 // LOGO_D016 indexeras med rasterlinjen: post 0 = linje 58, 1-24 = logon,
 // 25-26 = linje 83-84 (under logon).
@@ -165,8 +170,14 @@ logoStart:
     lda #D016_MENU          // resten av menyn: 40 kolumner, ingen scroll
     sta LOGO_D016+LOGO_H+1
     sta LOGO_D016+LOGO_H+2
-    lda #SPR_FLAGBAR
-    sta SCREEN_A+$3f8
+    lda #<FLAG_XMIN         // korset börjar vid vänster vägg, på golvet
+    sta flagXLo
+    lda #>FLAG_XMIN
+    sta flagXHi
+    lda #0
+    sta flagDir
+    sta flagSquash
+    sta bouncePhase
     lda #COL_YELLOW
     sta $d027
     lda #LOGO_LINE0-1       // spriten börjar på linjen efter sitt y-värde
@@ -248,14 +259,6 @@ drawLogo:
 // -------------------------------------------------------------------
 logoUpdate:
     inc wavePhase
-    lda bouncePhase
-    clc
-    adc #3
-    sta bouncePhase
-    inc flagPhase           // 1024 bildrutor (ca 20 s) per varv
-    bne !+
-    inc flagQuad
-!:
     // bokstävernas våg: egen finscroll för varje rasterlinje
     lda wavePhase
     sta tmp0
@@ -275,16 +278,23 @@ logoUpdate:
     cpx #LOGO_H
     bne !loop-
 
-    // vågräta balken: vilka rasterlinjer som är gula
+    // vågräta balken: nästa bildruta i studsserien
     ldx bouncePhase
-    lda bounceTab,x
-    sta tmp0                // balkens översta rad 0-19
+    lda bounceTop,x
+    sta tmp0                // översta raden 0-23
+    lda bounceH,x
+    sta tmp2                // tjocklek i rader
+    inx
+    cpx #BOUNCE_LEN
+    bne !+
     ldx #0
+!:  stx bouncePhase
+    ldx #0                  // vilka rasterlinjer som är gula
 !loop:
     txa
     sec
     sbc tmp0
-    cmp #FLAG_BAR_H         // 0 <= rad-topp < höjd -> gul
+    cmp tmp2                // 0 <= rad-topp < tjocklek -> gul
     lda #COL_BLUE
     bcs !+
     lda #COL_YELLOW
@@ -293,36 +303,61 @@ logoUpdate:
     cpx #LOGO_H
     bne !loop-
 
-    // lodräta balken: x = FLAG_CENTER ± flagXTab. Tabellen är en
-    // kvartsperiod; udda kvartar läses baklänges, kvart 2-3 åt vänster.
-    lda flagPhase
-    tax
-    lda flagQuad
-    lsr
-    bcc !+
-    txa
-    eor #$ff
-    tax
-!:  lda flagXTab,x
-    sta tmp1
-    lda flagQuad
-    and #2
+    // lodräta balken: jämn fart, vänder vid väggarna
+    lda flagSquash
+    beq !move+
+    dec flagSquash          // står still mot väggen
+    jmp !show+
+!move:
+    lda flagDir
     bne !left+
-    lda #<FLAG_CENTER
+    inc flagXLo             // åt höger
+    bne !+
+    inc flagXHi
+!:  lda flagXLo
+    cmp #<FLAG_XMAX
+    bne !show+
+    lda flagXHi
+    cmp #>FLAG_XMAX
+    bne !show+
+    lda #1                  // högra väggen
+    bne !hit+
+!left:
+    lda flagXLo             // åt vänster
+    bne !+
+    dec flagXHi
+!:  dec flagXLo
+    lda flagXLo
+    cmp #<FLAG_XMIN
+    bne !show+
+    lda flagXHi
+    cmp #>FLAG_XMIN
+    bne !show+
+    lda #0                  // vänstra väggen
+!hit:
+    sta flagDir             // vänd
+    lda #FLAG_SQUASH
+    sta flagSquash
+!show:
+    // ihoptryckt: 4 pixlar bred, mot den vägg den just träffat
+    // (högra väggen: flyttad 2 pixlar så att högerkanten ligger kvar)
+    lda #SPR_FLAGBAR
+    ldx #0
+    ldy flagSquash
+    beq !put+
+    lda #SPR_FLAGBAR4
+    ldy flagDir
+    beq !put+
+    ldx #2
+!put:
+    sta SCREEN_A+$3f8
+    stx tmp1
+    lda flagXLo
     clc
     adc tmp1
     sta $d000
-    lda #>FLAG_CENTER
+    lda flagXHi
     adc #0
-    sta $d010
-    rts
-!left:
-    lda #<FLAG_CENTER
-    sec
-    sbc tmp1
-    sta $d000
-    lda #>FLAG_CENTER
-    sbc #0
     sta $d010
     rts
 
