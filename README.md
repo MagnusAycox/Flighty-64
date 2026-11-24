@@ -134,6 +134,7 @@ autopiloten skeppet, du kliver ut och nästa nivå börjar.
 ![Fallskärmshoppet i VICE](docs/niva3/vice_fallskarm.png)
 ![Banan ovanifrån i VICE](docs/niva3/vice_vag3.png)
 ![Porten i VICE](docs/niva3/vice_port.png)
+![Multiplexern i VICE: 12 sprites](docs/niva3/vice_mux.png)
 
 Nivå 3, 6, 9 och så vidare är en egen sorts nivå som ses ovanifrån.
 
