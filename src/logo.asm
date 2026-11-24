@@ -156,6 +156,7 @@ buildLogoChars:
 logoStart:
     lda #0                  // nivå 3:s raster ska inte köras i menyn
     sta tdOn
+    jsr setSprShared
     ldx #119                // logoraderna: svart färg
     lda #COL_BLACK
 !loop:

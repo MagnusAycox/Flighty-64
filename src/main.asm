@@ -305,6 +305,11 @@ initVic:
     sta $d017
     sta $d01d
     sta $d01b               // sprites framför grafiken
+    // (faller igenom)
+
+// Spritarnas delade färger: vit och ljusröd (nivå 3 använder svart i
+// stället för vit, se tdStart)
+setSprShared:
     lda #COL_WHITE
     sta $d025
     lda #COL_LIGHT_RED
@@ -363,6 +368,7 @@ isTdLevel:
 
 // Grottnivå: springfas + flygfas
 beginCave:
+    jsr setSprShared
     lda #0
     sta tdOn
     sta $d015

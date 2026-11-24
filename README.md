@@ -150,8 +150,8 @@ Nivå 3, 6, 9 och så vidare är en egen sorts nivå som ses ovanifrån.
   rakt uppåt, flyger i en båge (skuggan visar var den är) och smäller en bit
   framför dig. Alla soldater nära smällen dör. Antalet granater står uppe
   till höger (GRENADE).
-* **Lådor** ligger på marken från våg 2. Gå på en låda så får du 4 granater
-  (högst 9).
+* **Lådor** (öppna trälådor med gröna granater) ligger på marken från våg 2.
+  Gå på en låda så får du 4 granater (högst 9).
 * **Soldaterna** kommer uppifrån, går en bit nedåt, stannar och skjuter och
   går sedan vidare. De går runt träd och sandsäckar.
 
@@ -297,7 +297,7 @@ räknas ut automatiskt från bilderna.
 | `$8800-$8fff` | Teckenset: 0-63 från ROM, 64-72 grottan, 88-119 och 192-239 nivå 3 |
 | `$8c00-$8de7` | Logotecknen (teckenkod 128-188, byggs vid start)           |
 | `$9000-$9fff` | (VIC ser tecken-ROM här, används inte för grafik)          |
-| `$a000-$a97f` | Sprites (kopieras hit vid start)                           |
+| `$a000-$aa7f` | Sprites (kopieras hit vid start)                           |
 | `$bfff`       | Byte som VIC visar mellan rader ("tomgång"), alltid 0      |
 | `$c000-$c1ff` | Ringbuffert för grottan, monster, skott, ljud, logons färger (körtid) |
 | `$c200-$cbff` | Nivå 3: banan, 64 rader x 40 tecken (ringbuffert)          |
@@ -452,6 +452,12 @@ bildruta, så varje omgång blir olika beroende på när man trycker fire.
 På nivå 3 fördelas sprites av multiplexern (se ovan).
 
 Alla sprites är multicolor (delade färger: vit och ljusröd).
+
+På nivå 3 är de delade färgerna svart och ljusröd i stället: figurerna ritas
+snett uppifrån med svart kontur, gevär och kängor, hud i ljusrött och
+uniformen i spritens egen färg (spelaren cyan, soldaterna bruna). Skottet och
+explosionen har egna versioner där. Hindren känns av vid fötterna, så
+huvudet kan gå in framför ett träd eller en sandsäck som står bakom.
 
 ---
 

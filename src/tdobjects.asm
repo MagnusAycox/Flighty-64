@@ -440,11 +440,11 @@ tdEnemyTry:
     beq !side+
 !bottom:
     lda #6                  // nedåt: nederkanten
-    ldy #16
+    ldy #18
     jsr tdBadAt
     bcs !no+
     lda #17
-    ldy #16
+    ldy #18
     jsr tdBadAt
     bcs !no+
 !side:
@@ -461,7 +461,7 @@ tdEnemyTry:
     bcs !no+
     ldy tmp7                // nederkanten är redan kollad om den gick nedåt
     bne !ok+
-    ldy #16
+    ldy #18
     jsr tdBadAt
     bcs !no+
 !ok:
@@ -985,7 +985,7 @@ tdCollide:
 !done:
     rts
 
-// Box A = soldat X (14x14)
+// Box A = soldat X (14x16)
 tdEnemyBox:
     lda E_XL,x
     clc
@@ -1000,10 +1000,11 @@ tdEnemyBox:
     sta tbAY
     lda #14
     sta tbAW
+    lda #16
     sta tbAH
     rts
 
-// Spelarens kropp (12x14) som box A eller B
+// Spelarens kropp (12x16) som box A eller B
 tdPlayerBoxA:
     lda px
     clc
@@ -1014,11 +1015,11 @@ tdPlayerBoxA:
     sta tbAX+1
     lda py
     clc
-    adc #2
+    adc #3
     sta tbAY
     lda #12
     sta tbAW
-    lda #14
+    lda #16
     sta tbAH
     rts
 tdPlayerBoxB:
@@ -1031,11 +1032,11 @@ tdPlayerBoxB:
     sta tbBX+1
     lda py
     clc
-    adc #2
+    adc #3
     sta tbBY
     lda #12
     sta tbBW
-    lda #14
+    lda #16
     sta tbBH
     rts
 
@@ -1205,7 +1206,7 @@ tdCrateCheck:
     sta cxHi
     lda py
     clc
-    adc #10
+    adc #15                 // vid fötterna
     jsr tdCharAt
     cmp #TD_CRATE_FIRST
     bcc !rts+
@@ -1521,10 +1522,10 @@ tdPushObjects:
     lsr
     and #1
     clc
-    adc #SPR_BOOM0
+    adc #SPR_TD_BOOM0
     bne !push+
 !sol:
-    lda #COL_GREY
+    lda #COL_BROWN
     sta vsTC
     lda E_POSE,x
     beq !+
@@ -1558,7 +1559,7 @@ tdPushObjects:
     sta vsTXH
     lda B_Y,x
     sta vsTY
-    lda #SPR_BULLET
+    lda #SPR_TD_BULLET
     sta vsTP
     lda #COL_YELLOW
     sta vsTC
@@ -1619,7 +1620,7 @@ tdPushObjects:
     lsr
     and #1
     clc
-    adc #SPR_BOOM0
+    adc #SPR_TD_BOOM0
     sta vsTP
     lda #COL_YELLOW
     sta vsTC
@@ -1646,7 +1647,7 @@ tdPushGrenade:              // skuggan på marken
 tdPushGrenadeTop:           // själva granaten (en bit upp i luften)
     lda #SPR_TD_GRENADE
     sta vsTP
-    lda #COL_DARK_GREY
+    lda #COL_LIGHT_GREEN
     sta vsTC
     lda #1
     sta vsTM

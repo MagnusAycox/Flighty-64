@@ -24,8 +24,8 @@ BORDER = 0
 CHAR_COL = {'.': BG, 'l': C1, 'b': C2, 'k': CR}
 
 for name, _, rows in make_gfx.SPRITES:
-    if name in ('BULLET', 'BOOM0', 'BOOM1'):
-        SPR[name] = rows
+    if name in ('TD_BULLET', 'TD_BOOM0', 'TD_BOOM1'):
+        SPR[name[3:]] = rows            # nivå 3:s versioner (svart $d025)
 
 
 def pal(i):
@@ -104,7 +104,7 @@ class Canvas:
             for rx, ch in enumerate(row.ljust(12, '.')):
                 if ch == '.':
                     continue
-                c = {'w': 1, 'b': color, 's': 10}[ch]
+                c = {'w': 0, 'b': color, 's': 10}[ch]     # $d025 svart, $d026 hud
                 for dy in range(sy):
                     for dx in range(2 * sx):
                         px = 32 + x + (rx * 2 * sx) + dx
@@ -183,12 +183,12 @@ def scene_wave1():
         "..T......,.......T..",
     ])
     c.hud(3, 1, 0)
-    c.sprite('ENEMY_DOWN', 60, 22, 12)
-    c.sprite('ENEMY_DOWN', 196, 46, 12)
-    c.sprite('ENEMY_DOWN', 262, 30, 12)
-    c.sprite('EBULLET', 70, 60, 7)
-    c.sprite('EBULLET', 70, 94, 7)
-    c.sprite('EBULLET', 206, 88, 7)
+    c.sprite('ENEMY_DOWN', 60, 22, 9)
+    c.sprite('ENEMY_DOWN', 196, 46, 9)
+    c.sprite('ENEMY_DOWN', 262, 30, 9)
+    c.sprite('EBULLET', 70, 60, 1)
+    c.sprite('EBULLET', 70, 94, 1)
+    c.sprite('EBULLET', 206, 88, 1)
     c.sprite('PLAYER_UP2', 150, 150, 3)
     c.sprite('BULLET', 158, 118, 7)
     c.sprite('BULLET', 158, 82, 7)
@@ -213,14 +213,14 @@ def scene_wave2():
         ".,..T....,..T.......",
     ])
     c.hud(3, 2, 3)
-    c.sprite('ENEMY_DOWN', 90, 28, 12)
-    c.sprite('ENEMY_DOWN', 236, 40, 12)
-    c.sprite('EBULLET', 92, 66, 7)      # snett ned vänster
-    c.sprite('EBULLET', 108, 66, 7)     # rakt ned
-    c.sprite('EBULLET', 124, 66, 7)     # snett ned höger
-    c.sprite('EBULLET', 232, 84, 7)
+    c.sprite('ENEMY_DOWN', 90, 28, 9)
+    c.sprite('ENEMY_DOWN', 236, 40, 9)
+    c.sprite('EBULLET', 92, 66, 1)      # snett ned vänster
+    c.sprite('EBULLET', 108, 66, 1)     # rakt ned
+    c.sprite('EBULLET', 124, 66, 1)     # snett ned höger
+    c.sprite('EBULLET', 232, 84, 1)
     c.sprite('BOOM1', 156, 70, 7)       # granaten slår ned
-    c.sprite('GRENADE', 168, 104, 11)   # nästa granat på väg upp
+    c.sprite('GRENADE', 168, 104, 13)   # nästa granat på väg upp
     c.sprite('SHADOW', 168, 136, 0)
     c.sprite('PLAYER_UP', 160, 150, 3)
     return c
@@ -244,11 +244,11 @@ def scene_wave4():
         "..,.....T......,..T.",
     ])
     c.hud(3, 4, 2)
-    c.sprite('ENEMY_DOWN', 120, 16, 12)
-    c.sprite('ENEMY_THROW', 220, 64, 12)
-    c.sprite('GRENADE', 200, 96, 11)
+    c.sprite('ENEMY_DOWN', 120, 16, 9)
+    c.sprite('ENEMY_THROW', 220, 64, 9)
+    c.sprite('GRENADE', 200, 96, 13)
     c.sprite('SHADOW', 196, 122, 0)
-    c.sprite('EBULLET', 130, 54, 7)
+    c.sprite('EBULLET', 130, 54, 1)
     c.sprite('PLAYER_UP', 166, 160, 3)
     c.sprite('BULLET', 174, 128, 7)
     return c
@@ -273,9 +273,9 @@ def scene_gate():
     ])
     c.hud(3, 4, 1)
     c.sprite('BOOM1', 152, 30, 7)
-    c.sprite('ENEMY_DOWN', 40, 40, 12)
-    c.sprite('ENEMY_DOWN', 270, 44, 12)
-    c.sprite('EBULLET', 50, 78, 7)
+    c.sprite('ENEMY_DOWN', 40, 40, 9)
+    c.sprite('ENEMY_DOWN', 270, 44, 9)
+    c.sprite('EBULLET', 50, 78, 1)
     c.sprite('PLAYER_UP', 150, 150, 3)
     return c
 

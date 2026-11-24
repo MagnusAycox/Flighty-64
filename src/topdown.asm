@@ -38,11 +38,12 @@ tdShotDY: .byte 256-6, 0,     0, 256-4, 256-4
 tdShotXO: .byte 8,     0,     16, 2,    14
 tdShotYO: .byte 256-6, 8,     8, 256-2, 256-2
 
-// Spelarens kropp (för krockar med träd och sandsäckar)
+// Spelarens fötter (för krockar med träd och sandsäckar): sett snett
+// uppifrån får huvudet gå in framför ett hinder som står bakom
 .const TD_FOOT_L = 6
 .const TD_FOOT_R = 17
-.const TD_FOOT_T = 4
-.const TD_FOOT_B = 16
+.const TD_FOOT_T = 10
+.const TD_FOOT_B = 19
 
 // -------------------------------------------------------------------
 // Rasteravbrottet (anropas från irqTop på linje 61): spelplanens $d011
@@ -72,6 +73,11 @@ tdStart:
     sta nextD011
     lda #0
     sta $d015
+    lda #COL_BLACK          // delade spritefärger: svart (kontur) och hud
+    sta $d025
+    lda #COL_LIGHT_RED
+    sta $d026
+    lda #0
     sta sprEnable
     sta B_ON
     sta B_ON+1
@@ -1122,7 +1128,7 @@ tdBuildSprites:
     lsr
     and #1
     clc
-    adc #SPR_BOOM0
+    adc #SPR_TD_BOOM0
     sta vsTP
     jsr vsPush
     jmp !rest+

@@ -105,10 +105,10 @@ class TdView:
         return c >= 192 or 112 <= c < 120      # hinder eller taggtråd
 
     def crate(self, x, y):
-        return 108 <= self.char_at(x + 11, y + 10) < 112   # som tdCrateCheck
+        return 108 <= self.char_at(x + 11, y + 15) < 112   # som tdCrateCheck
 
 
-TD_BOX = ((6, 4), (17, 4), (6, 16), (17, 16))     # samma hörn som tdBlocked
+TD_BOX = ((6, 10), (17, 10), (6, 19), (17, 19))   # samma hörn som tdBlocked
 
 
 _td_plan = {'path': [], 'key': None, 'idle': 0}

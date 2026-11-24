@@ -338,6 +338,13 @@ for _src, _dst in (('PLAYER_UP', 'TD_PLAYER0'), ('PLAYER_UP2', 'TD_PLAYER1'),
                    ('EBULLET', 'TD_EBULLET')):
     SPRITES.append((_dst, "top", L3.SPR[_src]))
 
+# Nivå 3 har svart $d025 (vit på de andra nivåerna): egna versioner av
+# skottet (svart kant, gul kärna) och explosionen.
+_swap = str.maketrans({'w': 'b', 'b': 'w'})
+SPRITES.append(("TD_BULLET", _by_name["BULLET"][0], [r.translate(_swap) for r in _by_name["BULLET"][1]]))
+SPRITES.append(("TD_BOOM0", "center", L3.SPR['BOOM0']))
+SPRITES.append(("TD_BOOM1", "center", L3.SPR['BOOM1']))
+
 # Hires-sprites (24x21, '#' = spritens färg): fallskärmen (2x2 sprites) och
 # gubben i selen (tre lager med en färg var på samma koordinater).
 HIRES_SPRITES = [(name, L3.HIRES[name]) for name in (

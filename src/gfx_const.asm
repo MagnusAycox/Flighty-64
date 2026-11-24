@@ -33,13 +33,16 @@
 .const SPR_TD_SHADOW = 157
 .const SPR_TD_GRENADE = 158
 .const SPR_TD_EBULLET = 159
-.const SPR_CANOPY_TL = 160   // hires
-.const SPR_CANOPY_TR = 161   // hires
-.const SPR_CANOPY_BL = 162   // hires
-.const SPR_CANOPY_BR = 163   // hires
-.const SPR_JUMPER_K = 164   // hires
-.const SPR_JUMPER_S = 165   // hires
-.const SPR_JUMPER_C = 166   // hires
+.const SPR_TD_BULLET = 160
+.const SPR_TD_BOOM0 = 161
+.const SPR_TD_BOOM1 = 162
+.const SPR_CANOPY_TL = 163   // hires
+.const SPR_CANOPY_TR = 164   // hires
+.const SPR_CANOPY_BL = 165   // hires
+.const SPR_CANOPY_BR = 166   // hires
+.const SPR_JUMPER_K = 167   // hires
+.const SPR_JUMPER_S = 168   // hires
+.const SPR_JUMPER_C = 169   // hires
 
 .const CH_ROCK0    = 64
 .const CH_ROCK1    = 65
@@ -53,7 +56,7 @@
 
 .const GFX_CHARS_LEN   = 72
 .const BOUNCE_LEN      = 139   // bildrutor i flaggans studsserie
-.const GFX_SPRITES_LEN = 2496
+.const GFX_SPRITES_LEN = 2688
 
 // Nivå 3: block (metatiles) och teckenkoder
 .const MT_GRASS0    = 0   // '.', tecken 88-91
@@ -121,6 +124,6 @@
 .const BOX_SEEK_B = 14
 .const BOX_TDPL_L = 4
 .const BOX_TDPL_R = 19
-.const BOX_TDPL_T = 0
-.const BOX_TDPL_B = 16
+.const BOX_TDPL_T = 1
+.const BOX_TDPL_B = 19
 
