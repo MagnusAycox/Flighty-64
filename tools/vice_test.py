@@ -408,6 +408,7 @@ def run_level3(a, g, mon, frame, snap, joy):
     for i in range(4):
         g.poke('EB_ON', 0, i)
     seen = set()
+    gate = 0
     for f in range(a.frames):
         joy[0] = td_bot(TdView(get), f)
         g.poke('lives', 3)
@@ -428,6 +429,13 @@ def run_level3(a, g, mon, frame, snap, joy):
                 snap('lv3_port.png')
             if st[1] and st[3] == 4:
                 snap('lv3_clear.png')
+        if st[1] and st[3] == 3:
+            gate += 1
+            if gate % 500 == 0:
+                v = TdView(get)
+                print("  vid porten %d bildrutor: granater %d, gubben %d,%d, granat i luften %d" % (
+                    gate, v.gren, v.px, v.py, v.pg_on))
+                snap('lv3_port_%d.png' % gate)
         if st[0] == 4 and st[1] == 0:
             break
     assert g.peek('level') == 4 and g.peek('tdOn') == 0, "nivå 4 startade inte efter nivå 3"

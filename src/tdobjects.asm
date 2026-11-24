@@ -1460,9 +1460,9 @@ tdGateCrate:
     bne !rts+
     lda #250
     sta tdCrateT
-    lda tdWrow              // skärmrad 16-17
-    sec
-    sbc #15
+    lda tdGateRow           // gräsraden precis nedanför muren: den är
+    sec                     // alltid fri och går att nå
+    sbc #2
     sta tsRow
     lda frameCount          // vänster eller höger sida
     and #1
