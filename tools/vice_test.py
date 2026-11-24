@@ -16,6 +16,9 @@ ROM:arna anges med --roms KATALOG som innehåller kernal, basic och chargen
 (hämtas med tools/get_openroms.sh). Saknas DISPLAY startas en virtuell
 skärm med Xvfb.
 
+Efter nivå 1-2 hoppar testet till slutet av nivå 2 och spelar nivå 3
+(banan ovanifrån) med en vägsökande bot (--skip-level3 hoppar över den).
+
 Exempel:
   tools/get_openroms.sh
   python3 tools/vice_test.py --roms build/openroms
@@ -207,6 +210,7 @@ def main():
     ap.add_argument('--chargen', default='chargen_openroms.rom')
     ap.add_argument('--out', default=os.path.join(ROOT, 'build', 'vice'))
     ap.add_argument('--frames', type=int, default=6500)
+    ap.add_argument('--skip-level3', action='store_true', help='hoppa över nivå 3')
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
 
@@ -335,8 +339,66 @@ def run(a, syms, mon):
                 snap('lv%d_fas%d_vag%d.png' % key)
         if st[0] == 2 and st[2] == 1:
             break
+
+    if not a.skip_level3:
+        run_level3(a, g, mon, frame, snap, joy)
     print("VICE-testet klart")
     mon.quit()
+
+
+def run_level3(a, g, mon, frame, snap, joy):
+    """Nivå 3: hoppa till slutet av flygfasen på nivå 2 och spela banan
+    ovanifrån (samma vägsökande bot som smoke_test)."""
+    from smoke_test import TdView, td_bot
+
+    def get(name, n):
+        ad = g.addr(name)
+        return mon.mem_get(ad, ad + n - 1, g.ram)
+
+    def step():
+        mon.resume()
+        frame()
+
+    g.poke('phase', 2)
+    g.poke('wave', 3)
+    g.poke('waveCol', 159)
+    for f in range(800):
+        g.poke('lives', 3)
+        g.poke('invuln', 10)
+        step()
+        if g.peek('tdOn'):
+            break
+    assert g.peek('tdOn') == 1 and g.peek('level') == 3, "nivå 3 startade inte"
+    print("nivå 3: startade (PREPARE TO JUMP)")
+    joy[0] = 0
+    for f in range(400):
+        step()
+        if f == 60:
+            snap('lv3_fallskarm.png')
+        if g.peek('tdState') == 2:
+            break
+    assert g.peek('tdState') == 2, "landade aldrig"
+    print("nivå 3: landade")
+    seen = set()
+    for f in range(a.frames):
+        joy[0] = td_bot(TdView(get), f)
+        g.poke('lives', 3)
+        step()
+        st = (g.peek('level'), g.peek('tdOn'), g.peek('wave'), g.peek('tdState'))
+        if st not in seen:
+            seen.add(st)
+            print("bildruta %5d: nivå %d, ovanifrån %d, våg %d, läge %d" % ((f,) + st))
+            if st[1] and st[3] == 2:
+                for _ in range(200):
+                    joy[0] = td_bot(TdView(get), f)
+                    step()
+                snap('lv3_vag%d.png' % (st[2] + 1))
+            if st[1] and st[3] == 3:
+                snap('lv3_clear.png')
+        if st[0] == 4 and st[1] == 0:
+            break
+    assert g.peek('level') == 4 and g.peek('tdOn') == 0, "nivå 4 startade inte efter nivå 3"
+    print("nivå 3: klar, nivå 4 startade")
 
 
 if __name__ == '__main__':

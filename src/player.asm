@@ -501,6 +501,14 @@ playerDock:
     beq !auto+
     jmp playerFly
 !auto:
+    lda level               // nästa nivå ovanifrån: hoppa ut med fallskärm
+    clc
+    adc #1
+    jsr isTdLevel
+    bne !land+
+    inc level
+    jmp tdStart
+!land:
     lda px
     cmp #DOCK_X
     beq !y+

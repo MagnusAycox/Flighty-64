@@ -1,29 +1,43 @@
 // GENERERAD FIL - ändra tools/make_gfx.py och kör om den.
 // Spritepekare, teckenkoder och kollisionsboxar.
 
-.const SPR_RUN0     = 64
-.const SPR_RUN1     = 65
-.const SPR_JUMP     = 66
-.const SPR_RUNL0    = 67
-.const SPR_RUNL1    = 68
-.const SPR_JUMPL    = 69
-.const SPR_SHIP0    = 70
-.const SPR_SHIP1    = 71
-.const SPR_WALK0    = 72
-.const SPR_WALK1    = 73
-.const SPR_BAT0     = 74
-.const SPR_BAT1     = 75
-.const SPR_BULLET   = 76
-.const SPR_BOOM0    = 77
-.const SPR_BOOM1    = 78
-.const SPR_FLOAT0   = 79
-.const SPR_FLOAT1   = 80
-.const SPR_HOP0     = 81
-.const SPR_HOP1     = 82
-.const SPR_SEEK0    = 83
-.const SPR_SEEK1    = 84
-.const SPR_FLAGBAR  = 85
-.const SPR_FLAGBAR4 = 86
+.const SPR_RUN0     = 128
+.const SPR_RUN1     = 129
+.const SPR_JUMP     = 130
+.const SPR_RUNL0    = 131
+.const SPR_RUNL1    = 132
+.const SPR_JUMPL    = 133
+.const SPR_SHIP0    = 134
+.const SPR_SHIP1    = 135
+.const SPR_WALK0    = 136
+.const SPR_WALK1    = 137
+.const SPR_BAT0     = 138
+.const SPR_BAT1     = 139
+.const SPR_BULLET   = 140
+.const SPR_BOOM0    = 141
+.const SPR_BOOM1    = 142
+.const SPR_FLOAT0   = 143
+.const SPR_FLOAT1   = 144
+.const SPR_HOP0     = 145
+.const SPR_HOP1     = 146
+.const SPR_SEEK0    = 147
+.const SPR_SEEK1    = 148
+.const SPR_FLAGBAR  = 149
+.const SPR_FLAGBAR4 = 150
+.const SPR_TD_PLAYER0 = 151
+.const SPR_TD_PLAYER1 = 152
+.const SPR_TD_ENEMY0 = 153
+.const SPR_TD_ENEMYT = 154
+.const SPR_TD_SHADOW = 155
+.const SPR_TD_GRENADE = 156
+.const SPR_TD_EBULLET = 157
+.const SPR_CANOPY_TL = 158   // hires
+.const SPR_CANOPY_TR = 159   // hires
+.const SPR_CANOPY_BL = 160   // hires
+.const SPR_CANOPY_BR = 161   // hires
+.const SPR_JUMPER_K = 162   // hires
+.const SPR_JUMPER_S = 163   // hires
+.const SPR_JUMPER_C = 164   // hires
 
 .const CH_ROCK0    = 64
 .const CH_ROCK1    = 65
@@ -37,7 +51,38 @@
 
 .const GFX_CHARS_LEN   = 72
 .const BOUNCE_LEN      = 139   // bildrutor i flaggans studsserie
-.const GFX_SPRITES_LEN = 1472
+.const GFX_SPRITES_LEN = 2368
+
+// Nivå 3: block (metatiles) och teckenkoder
+.const MT_GRASS0    = 0   // '.', tecken 88-91
+.const MT_GRASS1    = 1   // ',', tecken 92-95
+.const MT_CRATER    = 2   // 'O', tecken 96-99
+.const MT_RUBBLE_T  = 3   // 'R', tecken 100-103
+.const MT_RUBBLE_B  = 4   // 'r', tecken 104-107
+.const MT_CRATE     = 5   // 'C', tecken 108-111
+.const MT_WIRE      = 6   // 'X', tecken 112-115
+.const MT_WIRE_END  = 7   // 'Z', tecken 116-119
+.const MT_TREE      = 8   // 'T', tecken 192-195
+.const MT_SANDBAG   = 9   // 'S', tecken 196-199
+.const MT_WALL      = 10   // 'W', tecken 200-203
+.const MT_WALL_B    = 11   // 'V', tecken 204-207
+.const MT_GATE_TL   = 12   // 'G', tecken 208-211
+.const MT_GATE_TR   = 13   // 'H', tecken 212-215
+.const MT_GATE_BL   = 14   // 'I', tecken 216-219
+.const MT_GATE_BR   = 15   // 'J', tecken 220-223
+.const MT_GATED_TL  = 16   // 'g', tecken 224-227
+.const MT_GATED_TR  = 17   // 'h', tecken 228-231
+.const MT_GATED_BL  = 18   // 'i', tecken 232-235
+.const MT_GATED_BR  = 19   // 'j', tecken 236-239
+.const NUM_MT          = 20
+.const TD_PASS_FIRST   = 88   // passerbart
+.const TD_CRATE_FIRST  = 108   // låda
+.const TD_WIRE_FIRST   = 112   // taggtråd (farlig)
+.const TD_SOLID_FIRST  = 192   // stoppar gubben
+.const TD_CHARS1_FIRST = 88
+.const TD_CHARS1_LEN   = 256
+.const TD_CHARS2_FIRST = 192
+.const TD_CHARS2_LEN   = 384
 
 // Kollisionsboxar i spritepixlar (inklusive), union av alla ramar
 .const BOX_RUN_L = 2
@@ -72,4 +117,8 @@
 .const BOX_SEEK_R = 21
 .const BOX_SEEK_T = 6
 .const BOX_SEEK_B = 14
+.const BOX_TDPL_L = 4
+.const BOX_TDPL_R = 19
+.const BOX_TDPL_T = 0
+.const BOX_TDPL_B = 16
 

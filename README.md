@@ -11,6 +11,9 @@ står ett rymdskepp och väntar på marken. Spring in i det, så flyger du vidar
 genom en slingrande grotta där monstren både springer på marken och flyger i
 luften. Efter flygturen landar skeppet och nästa nivå börjar, med fler monster.
 
+Var tredje nivå är annorlunda: du hoppar ut med **fallskärm** och kämpar dig
+fram över en bana som ses **ovanifrån** (se [nivå 3](#nivå-3-banan-ovanifrån-under-arbete)).
+
 ![Startskärmens logo](docs/logo.gif)
 
 ![Huvudmenyn](docs/menu.png)
@@ -126,6 +129,29 @@ Efter flygfasens fjärde våg visas "PREPARE TO LAND". Under tiden marken
 planar ut kan du flyga fritt utan att krocka med grottan. Sedan landar
 autopiloten skeppet, du kliver ut och nästa nivå börjar.
 
+### Nivå 3: banan ovanifrån (under arbete)
+
+![Fallskärmshoppet i VICE](docs/niva3/vice_fallskarm.png)
+![Banan ovanifrån i VICE](docs/niva3/vice_vag3.png)
+
+Nivå 3, 6, 9 och så vidare är en egen sorts nivå som ses ovanifrån.
+
+* **Fallskärmshopp:** efter flygfasen på nivån innan visas "PREPARE TO JUMP".
+  Sedan sjunker du ned med fallskärm mot landningsplatsen. Joysticken
+  höger/vänster styr lite i sidled, och skuggan på marken visar var du landar.
+* **På marken** styr du gubben åt alla åtta håll. Träd och sandsäckar stoppar
+  dig. Banan rullar nedåt när du går uppåt i övre delen av skärmen, och den
+  går aldrig bakåt. Det finns alltid en väg igenom.
+* **Skjuta:** upp, vänster, höger eller snett upp åt vänster/höger, beroende
+  på joysticken. Utan riktning går skottet uppåt.
+* Nivån har 4 vågor. Efter våg 4 kommer "STAGE CLEAR" och nästa nivå.
+
+Det som finns nu är **steg 1** av planen: hoppet, banan, gubben och skotten.
+Fiender, granater och lådor, taggtråd och porten som ska sprängas kommer i
+nästa steg. Så här är det tänkt att se ut (mockups med spelets grafik):
+
+![Mockups av nivå 3](docs/niva3/oversikt.png)
+
 ### Poäng och liv
 
 | Händelse                    | Poäng |
@@ -204,14 +230,18 @@ src/
   sound.asm       Ljudeffekter via SID
   menu.asm        Huvudmeny med topplista, "GAME OVER"
   logo.asm        Startskärmens logo med studsande svensk flagga
+  topdown.asm     Nivå 3: banan ovanifrån, fallskärmshoppet, vertikal scroll
   highscore.asm   Topplistan och namninmatning
   gfx_const.asm   (genererad) spritepekare, teckenkoder, kollisionsboxar
   gfx_data.asm    (genererad) tecken- och spritedata
 tools/
   make_gfx.py     Ritar om grafiken från ASCII-konst -> gfx_*.asm
+  gfx_level3.py   Grafiken för nivå 3 (delas av make_gfx.py och mockup-skriptet)
+  mockup_level3.py Mockups av nivå 3 -> docs/niva3/
   ka_subset.py    Liten assembler för den KickAss-syntax spelet använder (test)
   emu.py          Minimal C64-testmiljö (py65) för provkörning och skärmbilder
-  smoke_test.py   Automatiskt test: meny -> nivå 1 (alla vågor) -> nivå 2 -> game over -> topplista
+  smoke_test.py   Automatiskt test: meny -> nivå 1 (alla vågor) -> nivå 2 -> game over -> topplista,
+                  sedan nivå 3 (hopp, alla vågor, nivå 4). --level3 kör bara nivå 3
   vice_test.py    Samma genomspelning i riktiga VICE via den binära monitorn
   get_openroms.sh Hämtar fria C64-ROM:ar (MEGA65 Open ROMs) för VICE-testet
 build.sh          Bygger med KickAssembler
@@ -236,16 +266,19 @@ räknas ut automatiskt från bilderna.
 
 | Adress        | Innehåll                                                   |
 |---------------|------------------------------------------------------------|
-| `$0801-$3fff` | BASIC-rad, programkod och grafikdata (källa)               |
-| `$4000-$43ff` | Skärm A (VIC-bank 1)                                       |
-| `$4400-$47ff` | Skärm B                                                    |
-| `$4800-$4fff` | Teckenset (tecken 0-63 kopieras från ROM, 64+ är grottan)  |
-| `$5000-$57ff` | Sprites (kopieras hit vid start)                           |
-| `$4c00-$4de7` | Logotecknen (teckenkod 128-188, byggs vid start)           |
+| `$0801-$7fff` | BASIC-rad, programkod och grafikdata (källa)               |
+| `$8000-$83ff` | Skärm A (VIC-bank 2)                                       |
+| `$8400-$87ff` | Skärm B                                                    |
+| `$8800-$8fff` | Teckenset: 0-63 från ROM, 64-72 grottan, 88-119 och 192-239 nivå 3 |
+| `$8c00-$8de7` | Logotecknen (teckenkod 128-188, byggs vid start)           |
+| `$9000-$9fff` | (VIC ser tecken-ROM här, används inte för grafik)          |
+| `$a000-$a97f` | Sprites (kopieras hit vid start)                           |
+| `$bfff`       | Byte som VIC visar mellan rader ("tomgång"), alltid 0      |
 | `$c000-$c1ff` | Ringbuffert för grottan, monster, skott, ljud, logons färger (körtid) |
+| `$c200-$cbff` | Nivå 3: banan, 64 rader x 40 tecken (ringbuffert)          |
 
-Grafiken ligger i VIC-bank 1 (`$dd00`). Programfilen blir då sammanhängande
-utan tomrum, och koden har plats ända upp till `$3fff`. BASIC- och KERNAL-ROM
+Grafiken ligger i VIC-bank 2 (`$dd00`). Programfilen blir då sammanhängande
+utan tomrum, och koden har plats ända upp till `$7fff`. BASIC- och KERNAL-ROM
 stängs av (`$01 = $35`), så spelet har hela zero page och egna
 avbrottsvektorer på `$fffa-$ffff`.
 
@@ -269,6 +302,27 @@ avbrottsvektorer på `$fffa-$ffff`.
   grottans finscroll. HUD:en står därför still medan grottan scrollar.
 * På startskärmen ligger det övre avbrottet på **linje 55** i stället och kör
   logons rasterloop (se nedan).
+* På nivå 3 ligger det på **linje 61**, se nedan.
+
+### Nivå 3: vertikal scroll
+
+* Banan byggs av block om 2x2 tecken (träd, sandsäckar, gräs ...) som läggs
+  rad för rad i en ringbuffert med 64 teckenrader (`$c200`). En slumpad stig,
+  fem block bred, hålls alltid fri från hinder.
+* Finscrollen är `$d011` (yscroll 0-7), grovscrollen samma dubbelbuffring
+  som i grottan: den synliga skärmen kopieras en rad nedåt till den dolda,
+  och den nya raden ritas överst.
+* HUD-raden står still. Den visas med yscroll 3 och 25 rader. Avbrottet på
+  linje 61 väntar till linje 63 och sätter då spelplanens `$d011` (24 rader,
+  yscroll = finscrollen). Nästa badline kommer därför först där spelplanen
+  ska börja. När yscroll är 7 skulle det matcha själva linje 63, så då
+  väntar avbrottet en linje till (annars kan VIC starta en badline mitt på
+  linjen). 24-radsläget döljer den halva rad som scrollar in längst ned.
+* Bakgrundsfärgen (gräs) slås på i vänsterkanten på samma linje, och HUD:en
+  visas i 40 kolumner så att ramen inte ändrar bredd vid övergången.
+* Fallskärmen är fyra vita hires-sprites (48x42 pixlar) och gubben i selen
+  tre hires-sprites med en färg var på samma koordinater (svart, ljusröd,
+  cyan). Tillsammans med skuggan används alla åtta sprites.
 
 ### Startskärmens logo
 
@@ -372,6 +426,8 @@ det via VICE:s binära monitor. Skriptet stannar emulatorn en gång per
 bildruta, läser spelets minne, styr gubben med samma enkla "bot" som
 `smoke_test.py` och sparar skärmbilder direkt från VIC-II. Det spelar hela
 vägen: menyn, alla vågor, rymdskeppet, flygfasen, landningen och nivå 2.
+Sedan hoppar det till slutet av nivå 2 och spelar nivå 3 (fallskärmen och
+banan ovanifrån, med en bot som söker väg runt hindren) fram till nivå 4.
 Det fungerar utan skärm; finns ingen startas en virtuell skärm (Xvfb).
 
 ```sh

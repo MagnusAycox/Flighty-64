@@ -453,8 +453,17 @@ columnPassed:
     sta landDelay
     lda #1
     sta gSeg
+    lda level               // nästa nivå ovanifrån: hoppa i stället
+    clc
+    adc #1
+    jsr isTdLevel
+    beq !jump+
     lda #<msgDock
     ldx #>msgDock
+    jmp showMsg
+!jump:
+    lda #<msgJump
+    ldx #>msgJump
     jmp showMsg
 !done:
     rts

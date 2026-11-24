@@ -3,27 +3,30 @@
 // ===================================================================
 //
 // Minneskarta:
-//   $0801-$3fff  BASIC-start, programkod och grafikdata (källa)
-//   VIC-bank 1 ($4000-$7fff):
-//   $4000-$43ff  Skärm A (dubbelbuffring)
-//   $4400-$47ff  Skärm B (dubbelbuffring)
-//   $4800-$4fff  Teckenset (tecken 0-63 kopieras från ROM, 64+ egna)
-//   $5000-$57ff  Sprites (kopieras dit vid start)
-//   $c000-$c1ff  Variabler/tabeller som inte behöver laddas
+//   $0801-$7fff  BASIC-start, programkod och grafikdata (källa)
+//   VIC-bank 2 ($8000-$bfff):
+//   $8000-$83ff  Skärm A (dubbelbuffring)
+//   $8400-$87ff  Skärm B (dubbelbuffring)
+//   $8800-$8fff  Teckenset (tecken 0-63 kopieras från ROM, 64+ egna)
+//   $9000-$9fff  (VIC ser tecken-ROM här - används inte för grafik)
+//   $a000-$afff  Sprites (kopieras dit vid start)
+//   $bfff        "Tomgångsbyte" som VIC visar mellan rader (= 0)
+//   $c000-$cbff  Variabler/tabeller som inte behöver laddas
 //
 // BASIC- och KERNAL-ROM slås av ($01 = $35), så hela zero page är vår.
 // ===================================================================
 
-.const VIC_BANK   = $4000
-.const SCREEN_A   = $4000
-.const SCREEN_B   = $4400
-.const CHARSET    = $4800
-.const SPRITES    = $5000
+.const VIC_BANK   = $8000
+.const SCREEN_A   = $8000
+.const SCREEN_B   = $8400
+.const CHARSET    = $8800
+.const SPRITES    = $a000
+.const IDLE_BYTE  = $bfff
 .const COLORRAM   = $d800
 .const SCREEN_B_OFS_HI = $04      // >(SCREEN_B - SCREEN_A)
-.const COLOR_OFS_HI    = $98      // >(COLORRAM - SCREEN_A)
+.const COLOR_OFS_HI    = $58      // >(COLORRAM - SCREEN_A)
 
-.const D018_A     = $02           // skärm +$0000, tecken +$0800 (i bank 1)
+.const D018_A     = $02           // skärm +$0000, tecken +$0800 (i bank 2)
 .const D018_B     = $12           // skärm +$0400, tecken +$0800
 .const D016_MENU  = $08           // 40 kolumner, multicolor av (text i alla färger)
 .const D016_HUD   = $00           // 38 kolumner, multicolor av, ingen scroll
@@ -40,6 +43,7 @@
 .const IRQ_LINE_BOTTOM = 251
 .const IRQ_LINE_TOP    = 63
 .const IRQ_LINE_LOGO   = 55       // startskärmen: före logon på rad 1-3
+.const IRQ_LINE_TD     = 61       // nivå 3: före den vertikala finscrollen
 
 // Spel-tillstånd
 .const ST_MENU     = 0
@@ -135,6 +139,24 @@
 .const SFX_DEATH  = 3
 .const SFX_PICKUP = 4
 .const SFX_BLIP   = 5
+
+// -------------------------------------------------------------------
+// Nivå 3: banan ovanifrån (topdown.asm)
+// -------------------------------------------------------------------
+.const TD_TOP_LINE  = 64          // rasterlinjen där rad 2 börjar när tdFine = 0
+.const TD_D016      = $18         // 40 kolumner, multicolor, ingen sidscroll
+.const TD_CR        = 8 + COL_BLACK   // färg-RAM: multicolor, svart
+.const TD_SCROLL_Y  = 120         // högre upp än så scrollar banan i stället
+.const TD_MIN_X     = 24
+.const TD_MAX_X     = 320
+.const TD_MAX_Y     = 222
+.const TD_LAND_Y    = 180         // där fallskärmen landar
+.const TD_WAVE_ROWS = 96          // teckenrader per våg (768 pixlar)
+.const TD_INTRO_MT  = 7           // blockrader öppen mark vid landningsplatsen
+.const TDS_INTRO    = 0           // fallskärmshoppet
+.const TDS_LAND     = 1           // landat, fallskärmen faller ihop
+.const TDS_PLAY     = 2
+.const TDS_CLEAR    = 3           // nivån klar (tills porten finns)
 
 // -------------------------------------------------------------------
 // Zero page
@@ -246,6 +268,28 @@
 .const scrollFine  = $98          // rulltextens finscroll 0-7
 .const scrollPtr   = $99          // 2 byte: nästa tecken i rulltexten
 .const scrollD016  = $9b          // $d016 för rulltextens rad
+.const tdOn        = $9c          // 1 = nivå 3 (banan ovanifrån) körs
+.const tdFine      = $9d          // vertikal finscroll 0-7
+.const tdWrow      = $9e          // världsrad som visas på skärmrad 2
+.const tdGenRow    = $9f          // nästa världsrad som ska genereras
+.const tdNewRow    = $a0          // världsrad som ritas överst i dolda bufferten
+.const tdHalf      = $a1          // 0 = nästa rad är blockens nedre halva
+.const tdPath      = $a2          // den garanterade stigens mitt (blockkolumn)
+.const tdState     = $a3          // TDS_xxx
+.const tdTimer     = $a4
+.const pendingD011 = $a5
+.const nextD011    = $a6          // $d011 för spelplanen (skrivs av IRQ)
+.const tdRows      = $a7          // rader in i vågen
+.const sprMC       = $a8          // skuggregister för $d01c
+.const sprXexp     = $a9          // $d01d
+.const sprYexp     = $aa          // $d017
+.const sprPrio     = $ab          // $d01b
+.const debugLevel  = $ac          // test: starta på denna nivå (0 = nivå 1)
+.const pxHi        = $ad          // nivå 3: spelarens x är 16 bitar
+.const tdGren      = $ae          // antal granater
+.const tdDens      = $af          // hur tätt hindren står (0-255)
+.const tdIntroRows = $b0          // blockrader kvar av öppen mark
+.const tdPtr       = $b1          // 2 byte
 .const LOGO_LINES  = $c180        // 27 byte: $d021 per rasterlinje, linje 58-84
 .const LOGO_D016   = $c1a0        // 27 byte: $d016 per rasterlinje, linje 58-84
 .const sprX        = $68          // 8 byte
@@ -277,6 +321,9 @@
 .const B_DX        = $c148
 .const B_DY        = $c14a
 .const M_VY        = $c160        // hoppande monster: hastighet (px*4)
+
+.const TD_META     = $c1c0        // 20 byte: blockraden som genereras
+.const MAP_RING    = $c200        // 64 rader x 40 tecken: banan (ringbuffert)
 
 .const SFX_TIMER   = $c150
 .const SFX_FREQ    = $c153

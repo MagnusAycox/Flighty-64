@@ -22,12 +22,16 @@ Multicolor-tecken (4 x 8 "feta" pixlar):
 """
 import math
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gfx_level3 as L3    # noqa: E402  grafiken för nivå 3 (banan ovanifrån)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
 
-VIC_BANK = 0x4000
-SPRITE_BASE_ADDR = 0x5000     # spritedata kopieras hit vid start
+VIC_BANK = 0x8000
+SPRITE_BASE_ADDR = 0xA000     # spritedata kopieras hit vid start ($9000-$9fff = tecken-ROM för VIC)
 FIRST_CHAR = 64               # egna tecken: 64 och uppåt
 
 LOGO_WIDTH = 272              # "SOFTWARE OF SWEDEN": 16 bokstäver x 16 px + 2 mellanslag x 8 px
@@ -326,6 +330,19 @@ _mirrored = [(n.replace("RUN", "RUNL").replace("JUMP", "JUMPL"), a, [row[::-1] f
              for n, a, r in SPRITES if n in ("RUN0", "RUN1", "JUMP")]
 SPRITES = SPRITES[:3] + _mirrored + SPRITES[3:]
 
+# Nivå 3: multicolor-sprites (gfx_level3.SPR) under nya namn
+for _src, _dst in (('PLAYER_UP', 'TD_PLAYER0'), ('PLAYER_UP2', 'TD_PLAYER1'),
+                   ('ENEMY_DOWN', 'TD_ENEMY0'), ('ENEMY_THROW', 'TD_ENEMYT'),
+                   ('SHADOW', 'TD_SHADOW'), ('GRENADE', 'TD_GRENADE'),
+                   ('EBULLET', 'TD_EBULLET')):
+    SPRITES.append((_dst, "top", L3.SPR[_src]))
+
+# Hires-sprites (24x21, '#' = spritens färg): fallskärmen (2x2 sprites) och
+# gubben i selen (tre lager med en färg var på samma koordinater).
+HIRES_SPRITES = [(name, L3.HIRES[name]) for name in (
+    'CANOPY_TL', 'CANOPY_TR', 'CANOPY_BL', 'CANOPY_BR',
+    'JUMPER_K', 'JUMPER_S', 'JUMPER_C')]
+
 # Kollisionsboxar (union av ramar)
 BOXES = {
     "RUN": ["RUN0", "RUN1", "JUMP"],
@@ -336,6 +353,7 @@ BOXES = {
     "FLOAT": ["FLOAT0", "FLOAT1"],
     "HOP": ["HOP0", "HOP1"],
     "SEEK": ["SEEK0", "SEEK1"],
+    "TDPL": ["TD_PLAYER0", "TD_PLAYER1"],
 }
 
 # ----------------------------------------------------------------- tecken
@@ -453,6 +471,28 @@ def sprite_bytes(rows):
     return out
 
 
+def hires_bytes(rows):
+    assert len(rows) == 21 and all(len(r) == 24 for r in rows)
+    out = []
+    for r in rows:
+        v = int(''.join('1' if c == '#' else '0' for c in r), 2)
+        out += [(v >> 16) & 255, (v >> 8) & 255, v & 255]
+    out.append(0)
+    return out
+
+
+def level3_chars():
+    """Nivå 3: tecken per teckenkod (8 byte var) och blocktabeller."""
+    m = {'.': 0, 'l': 1, 'b': 2, 'k': 3}
+    chars = {}
+    for key, name, code in L3.TILE_ORDER:
+        art = L3.META[key]
+        assert len(art) == 16 and all(len(r) == 8 for r in art), key
+        for k, (ry, rx) in enumerate(((0, 0), (0, 4), (8, 0), (8, 4))):
+            chars[code + k] = [encode_row(art[ry + y][rx:rx + 4], m, 4) for y in range(8)]
+    return chars
+
+
 def bbox(rows):
     xs, ys = [], []
     for y, r in enumerate(rows):
@@ -506,13 +546,32 @@ def main():
     ptr0 = (SPRITE_BASE_ADDR - VIC_BANK) // 64
     for i, (name, _, _) in enumerate(SPRITES):
         const.append(".const SPR_%-8s = %d" % (name, ptr0 + i))
+    for i, (name, _) in enumerate(HIRES_SPRITES):
+        const.append(".const SPR_%-8s = %d   // hires" % (name, ptr0 + len(SPRITES) + i))
     const.append("")
     for i, (name, _) in enumerate(CHARS):
         const.append(".const CH_%-8s = %d" % (name, FIRST_CHAR + i))
     const.append("")
     const.append(".const GFX_CHARS_LEN   = %d" % (len(CHARS) * 8))
     const.append(".const BOUNCE_LEN      = %d   // bildrutor i flaggans studsserie" % len(bounce_frames()[0]))
-    const.append(".const GFX_SPRITES_LEN = %d" % (len(SPRITES) * 64))
+    const.append(".const GFX_SPRITES_LEN = %d" % ((len(SPRITES) + len(HIRES_SPRITES)) * 64))
+    const.append("")
+    const.append("// Nivå 3: block (metatiles) och teckenkoder")
+    for i, (key, name, code) in enumerate(L3.TILE_ORDER):
+        const.append(".const MT_%-9s = %d   // '%s', tecken %d-%d" % (name, i, key, code, code + 3))
+    const.append(".const NUM_MT          = %d" % len(L3.TILE_ORDER))
+    const.append(".const TD_PASS_FIRST   = %d   // passerbart" % L3.TD_PASS_FIRST)
+    const.append(".const TD_CRATE_FIRST  = %d   // låda" % L3.TD_CRATE_FIRST)
+    const.append(".const TD_WIRE_FIRST   = %d   // taggtråd (farlig)" % L3.TD_WIRE_FIRST)
+    const.append(".const TD_SOLID_FIRST  = %d   // stoppar gubben" % L3.TD_SOLID_FIRST)
+    l3 = level3_chars()
+    b1 = [c for c in l3 if c < 128]
+    b2 = [c for c in l3 if c >= 128]
+    assert b1 == list(range(min(b1), max(b1) + 1)) and b2 == list(range(min(b2), max(b2) + 1))
+    const.append(".const TD_CHARS1_FIRST = %d" % min(b1))
+    const.append(".const TD_CHARS1_LEN   = %d" % (len(b1) * 8))
+    const.append(".const TD_CHARS2_FIRST = %d" % min(b2))
+    const.append(".const TD_CHARS2_LEN   = %d" % (len(b2) * 8))
     const.append("")
     const.append("// Kollisionsboxar i spritepixlar (inklusive), union av alla ramar")
     for bname, frames in BOXES.items():
@@ -554,6 +613,28 @@ def main():
             data.append("    .byte %%%s, %%%s, %%%s    // %s" % (
                 format(b[0], "08b"), format(b[1], "08b"), format(b[2], "08b"), r))
         data.append("    .byte 0")
+    for name, rows in HIRES_SPRITES:
+        data.append("// %s (hires)" % name)
+        vals = hires_bytes(rows)
+        for y, r in enumerate(rows):
+            b = vals[y * 3:y * 3 + 3]
+            data.append("    .byte %%%s, %%%s, %%%s    // %s" % (
+                format(b[0], "08b"), format(b[1], "08b"), format(b[2], "08b"), r))
+        data.append("    .byte 0")
+    data.append("")
+    data.append("// ---------------------------------------------------------------")
+    data.append("// Nivå 3: tecken för banan ovanifrån (kopieras till teckensetet)")
+    data.append("// ---------------------------------------------------------------")
+    names = {code + k: "%s %s" % (name, ("TL", "TR", "BL", "BR")[k])
+             for key, name, code in L3.TILE_ORDER for k in range(4)}
+    for label, codes in (("gfxTdChars1", b1), ("gfxTdChars2", b2)):
+        data.append("%s:" % label)
+        for c in codes:
+            data.append("    .byte " + ", ".join("$%02x" % v for v in l3[c]) + "    // %d %s" % (c, names[c]))
+    data.append("// Blocktabeller: teckenkod för övre vänster/höger, nedre vänster/höger")
+    for label, k in (("mtTL", 0), ("mtTR", 1), ("mtBL", 2), ("mtBR", 3)):
+        data.append("%s:" % label)
+        data += fmt_bytes([code + k for _, _, code in L3.TILE_ORDER], 20)
     data.append("")
     data.append("// ---------------------------------------------------------------")
     data.append("// Sinustabell för flygande monster (64 steg, 0..40)")

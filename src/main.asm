@@ -39,10 +39,12 @@ start:
 
     lda #$0b                // skärmen av under init
     sta $d011
-    lda $dd00               // VIC-bank 1 ($4000-$7fff)
+    lda $dd00               // VIC-bank 2 ($8000-$bfff)
     and #$fc
-    ora #$02
+    ora #$01
     sta $dd00
+    lda #0                  // VIC visar denna byte mellan rader (tomgång)
+    sta IDLE_BYTE
 
     jsr copyCharRom
     jsr buildLogoChars
@@ -108,7 +110,10 @@ menuLoop:
 gameLoop:
     jsr waitFrame
     jsr applyFrame          // sprites + scrollregister (i vblank)
-    jsr copyStep            // förbered den dolda skärmbufferten
+    lda tdOn                // nivå 3 har en egen loop (topdown.asm)
+    beq !+
+    jmp tdFrame
+!:  jsr copyStep            // förbered den dolda skärmbufferten
     jsr soundUpdate
     jsr readJoy
     lda gameState
@@ -206,7 +211,7 @@ copyCharRom:
     rts
 
 // -------------------------------------------------------------------
-// Kopiera egna tecken och sprites till VIC-bank 1
+// Kopiera egna tecken och sprites till VIC-bank 2
 // -------------------------------------------------------------------
 copyGfx:
     lda #<gfxChars
@@ -220,6 +225,32 @@ copyGfx:
     lda #<GFX_CHARS_LEN
     sta memLen
     lda #>GFX_CHARS_LEN
+    sta memLen+1
+    jsr memCopy
+    lda #<gfxTdChars1       // nivå 3: banans tecken
+    sta memSrc
+    lda #>gfxTdChars1
+    sta memSrc+1
+    lda #<(CHARSET + TD_CHARS1_FIRST*8)
+    sta memDst
+    lda #>(CHARSET + TD_CHARS1_FIRST*8)
+    sta memDst+1
+    lda #<TD_CHARS1_LEN
+    sta memLen
+    lda #>TD_CHARS1_LEN
+    sta memLen+1
+    jsr memCopy
+    lda #<gfxTdChars2
+    sta memSrc
+    lda #>gfxTdChars2
+    sta memSrc+1
+    lda #<(CHARSET + TD_CHARS2_FIRST*8)
+    sta memDst
+    lda #>(CHARSET + TD_CHARS2_FIRST*8)
+    sta memDst+1
+    lda #<TD_CHARS2_LEN
+    sta memLen
+    lda #>TD_CHARS2_LEN
     sta memLen+1
     jsr memCopy
     lda #<gfxSprites
@@ -300,11 +331,46 @@ setFlyColors:
 startGame:
     jsr logoStop
     lda #0
-    sta $d015
-    sta sprEnable
     sta score
     sta score+1
     sta score+2
+    lda #ST_PLAY
+    sta gameState
+    lda #3
+    sta lives
+    lda debugLevel          // (testerna kan starta på en senare nivå)
+    bne !+
+    lda #1
+!:  sta level
+    // fall igenom
+
+// Starta nivån i 'level': var tredje nivå är banan ovanifrån
+startLevel:
+    lda level
+    jsr isTdLevel
+    bne beginCave
+    jmp tdStart
+
+// isTdLevel: A = nivå. Z=1 om nivån är en nivå ovanifrån (3, 6, 9 ...)
+isTdLevel:
+    sec
+!loop:
+    sbc #3
+    beq !done+
+    bcs !loop-
+!done:
+    rts
+
+// Grottnivå: springfas + flygfas
+beginCave:
+    lda #0
+    sta tdOn
+    sta $d015
+    sta sprEnable
+    sta sprXexp
+    sta sprYexp
+    sta sprPrio
+    sta pxHi
     sta wave
     sta waveCol
     sta facing
@@ -328,14 +394,12 @@ startGame:
     dex
     bpl !loop-
 
-    lda #ST_PLAY
-    sta gameState
+    lda #$ff
+    sta sprMC
+    lda #IRQ_LINE_TOP
+    sta irqTopLine
     lda #PH_RUN
     sta phase
-    lda #3
-    sta lives
-    lda #1
-    sta level
     lda #2
     sta scrollSpeed
     lda #7
@@ -413,6 +477,7 @@ startGame:
 #import "menu.asm"
 #import "logo.asm"
 #import "highscore.asm"
+#import "topdown.asm"
 
 // Grafikdata (genererad av tools/make_gfx.py)
 #import "gfx_data.asm"

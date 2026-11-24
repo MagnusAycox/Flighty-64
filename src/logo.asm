@@ -154,6 +154,8 @@ buildLogoChars:
 // logoStart: slå på logon (anropas av showMenu efter rensning)
 // -------------------------------------------------------------------
 logoStart:
+    lda #0                  // nivå 3:s raster ska inte köras i menyn
+    sta tdOn
     ldx #119                // logoraderna: svart färg
     lda #COL_BLACK
 !loop:
@@ -200,6 +202,7 @@ logoStart:
 logoStop:
     lda #0
     sta logoOn
+    sta tdOn
     sta $d015
     sta $d017
     sta $d01b

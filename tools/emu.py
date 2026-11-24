@@ -276,27 +276,39 @@ class C64:
         img = Image.new('RGB', (W, H))
         px = img.load()
         top_line = 16          # bildens rad 0 = rasterlinje 16
-        left = 24 + 32 - 24    # x=32 i bilden = spritekoordinat 24... förenkla
+        default = (0x1b, 0x08, 0x14, 14, 6, 0, 0)
+        # VIC:ens radlogik per rasterlinje: badlines, radräknare (RC),
+        # tomgång mellan rader och den vertikala ramen (RSEL 24/25 rader).
+        rows = [None] * LINES
+        vborder = [True] * LINES
+        vcbase, vc, rc, display, border = 0, 0, 0, False, True
+        for line in range(LINES):
+            d011 = (self.line_regs[line] or default)[0]
+            rsel = d011 & 8
+            if line == (0x33 if rsel else 0x37) and d011 & 0x10:
+                border = False
+            if line == (0xfb if rsel else 0xf7):
+                border = True
+            vborder[line] = border
+            if d011 & 0x10 and 0x30 <= line <= 0xf7 and (line & 7) == (d011 & 7):
+                display, rc, vc = True, 0, vcbase
+            if display:
+                rows[line] = (vc // 40, rc)
+                if rc == 7:
+                    display = False
+                    vcbase = vc + 40
+                else:
+                    rc += 1
         for y in range(H):
             line = y + top_line
-            regs = self.line_regs[line % LINES] or (0x1b, 0x08, 0x14, 14, 6, 0, 0)
+            regs = self.line_regs[line % LINES] or default
             d011, d016, d018, d020, d021, d022, d023 = regs
             border = PALETTE[d020 & 15]
             for x in range(W):
                 px[x, y] = border
-            if not (d011 & 0x10):
+            if not (d011 & 0x10) or vborder[line % LINES]:
                 continue
-            yscroll = d011 & 7
-            first = 0x33 if d011 & 8 else 0x37
-            last = 0xfb if d011 & 8 else 0xf7
-            if not (first <= line < last):
-                continue
-            rowline = line - 0x30 - yscroll
-            if rowline < 0:
-                continue
-            row, cy = rowline // 8, rowline % 8
-            if row > 24:
-                continue
+            ri = rows[line % LINES]
             xscroll = d016 & 7
             mc = d016 & 0x10
             x0 = 32 if d016 & 8 else 39
@@ -308,7 +320,8 @@ class C64:
             for x in range(x0, x1):
                 px[x, y] = bg
             fg = set()             # förgrundspixlar (för sprite-prioritet)
-            for sx in range(320):
+            row, cy = ri if ri else (0, 0)
+            for sx in range(320 if ri else 0):
                 X = sx + xscroll
                 if X >= 320:
                     continue

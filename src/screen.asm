@@ -184,6 +184,33 @@ msgDock:
     .byte 0
     .byte $ff
 
+msgJump:
+    .byte 0, 12, COL_YELLOW
+    .text "PREPARE TO JUMP"
+    .byte 0
+    .byte $ff
+msgDrop:
+    .byte 0, 11, COL_YELLOW
+    .text "LEVEL 00  DROP ZONE"
+    .byte 0
+    .byte $ff
+msgClear:
+    .byte 0, 14, COL_YELLOW
+    .text "STAGE CLEAR!"
+    .byte 0
+    .byte $ff
+
+// Nivå 3: GRENADE i stället för HI
+.const HUD_GREN = 38
+hudTextTd:
+    .byte 0, 30, COL_LIGHT_BLUE
+    .text "GRENADE"
+    .byte 0
+    .byte 0, HUD_GREN, COL_YELLOW
+    .text "0"
+    .byte 0
+    .byte $ff
+
 // showMsg: visa blocklistan A/X på HUD-raden i ca 2,5 sekunder
 showMsg:
     jsr clearHudRow
@@ -191,6 +218,25 @@ showMsg:
     lda #125
     sta hudMsgTimer
     rts
+
+// Töm HI-fältet (kolumn 30-39) i båda buffertarna
+clearHiField:
+    ldx #9
+    lda #32
+!loop:
+    sta SCREEN_A+30,x
+    sta SCREEN_B+30,x
+    dex
+    bpl !loop-
+    rts
+
+// "LEVEL nn  DROP ZONE"
+showDropMsg:
+    lda #<msgDrop
+    ldx #>msgDrop
+    jsr showMsg
+    ldx #17
+    jmp putLevel
 
 // "LEVEL nn  WAVE n"
 showWaveMsg:
@@ -247,7 +293,13 @@ drawHud:
     lda #<hudText
     ldx #>hudText
     jsr printList
-    // fall igenom
+    lda tdOn
+    beq !+
+    jsr clearHiField
+    lda #<hudTextTd
+    ldx #>hudTextTd
+    jsr printList
+!:  // fall igenom
 hudUpdate:
     lda hudMsgTimer         // visas ett meddelande?
     beq !normal+
@@ -291,6 +343,15 @@ hudUpdate:
     ora #$30
     sta SCREEN_A+HUD_LIVES
     sta SCREEN_B+HUD_LIVES
+
+    lda tdOn                // nivå 3: antal granater i stället för HI
+    beq !hi+
+    lda tdGren
+    ora #$30
+    sta SCREEN_A+HUD_GREN
+    sta SCREEN_B+HUD_GREN
+    rts
+!hi:
 
     // HI = max(poäng, bästa i listan)
     lda score

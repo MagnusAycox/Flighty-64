@@ -6,10 +6,13 @@ Automatiskt röktest för Flighty 64 (utan KickAssembler/VICE).
 2. Kör spelet i tools/emu.py med en enkel "bot" som spelar:
    meny (logo-effekten) -> springfas (4 vågor) -> rymdskepp -> flygfas (4 vågor)
    -> landning -> nivå 2 -> game over -> topplista
+   och sedan nivå 3 (banan ovanifrån): slutet av nivå 2 -> "PREPARE TO
+   JUMP" -> fallskärmshopp -> 4 vågor -> STAGE CLEAR -> nivå 4
 3. Kontrollerar att inget kraschar, att alla faser och alla monstertyper
    dyker upp och att en bildruta aldrig tar mer CPU-tid än vad som finns.
 
-Kör:  python3 tools/smoke_test.py [--shots katalog]
+Kör:  python3 tools/smoke_test.py [--shots katalog] [--level3]
+      (--level3: bara testet av nivå 3)
 """
 import os
 import subprocess
@@ -71,6 +74,201 @@ def bot(c, f):
     return j
 
 
+class TdView:
+    """Det nivå 3-boten behöver veta, läst ur minnet via get(namn, antal)."""
+
+    def __init__(self, get):
+        self.get = get
+        st = get('tdState', 1)[0]
+        self.state = st
+        self.px = get('px', 1)[0] + 256 * get('pxHi', 1)[0]
+        self.py = get('py', 1)[0]
+        self.fine = get('tdFine', 1)[0]
+        self.wrow = get('tdWrow', 1)[0]
+        self.ring = get('MAP_RING', 64 * 40) if st == 2 else None
+
+    def char_at(self, x, y):
+        """Samma uträkning som tdCharAt i topdown.asm."""
+        line = y + 1
+        top = 64 + self.fine
+        row = self.wrow + 1 if line < top else self.wrow - ((line - top) >> 3)
+        col = max(0, min(39, (x - 24) >> 3))
+        return self.ring[(row & 63) * 40 + col]
+
+    def solid(self, x, y):
+        return self.char_at(x, y) >= 192
+
+
+TD_BOX = ((6, 4), (17, 4), (6, 16), (17, 16))     # samma hörn som tdBlocked
+
+
+_td_plan = {'path': [], 'key': None, 'idle': 0}
+
+
+def td_bot(v, f):
+    """Nivå 3: hitta en väg (bredden först, rutnät på 4 pixlar) från gubben
+    till överkanten av spelplanen där banan kan scrolla vidare, och följ den
+    tills den är gången (eller banan har scrollat)."""
+    if v.state != 2:
+        return 0
+    j = 16 if f % 10 < 2 else 0
+    plan = _td_plan
+
+    def free(x, y):
+        return not any(v.solid(x + a, y + b) for a, b in TD_BOX)
+
+    key = (v.wrow, v.fine)
+    if plan['key'] != key or not plan['path'] or plan['idle'] > 8:
+        plan['key'] = key
+        plan['idle'] = 0
+        plan['path'] = td_find_path(v, free)
+    path = plan['path']
+    while path and path[0] == (v.px, v.py):
+        path.pop(0)
+        plan['idle'] = 0
+    if not path:
+        if v.py <= 120 and free(v.px, v.py - 1):
+            return j | 1        # vid överkanten: uppåt (banan scrollar)
+        return j | 2            # ingen väg syns: backa
+    nx, ny = path[0]
+    plan['idle'] += 1
+    if nx < v.px:
+        j |= 4
+    elif nx > v.px:
+        j |= 8
+    if ny < v.py:
+        j |= 1
+    elif ny > v.py:
+        j |= 2
+    return j
+
+
+def td_find_path(v, free):
+    """Bredden först från gubben till en plats vid överkanten där han kan gå
+    uppåt. Rutnät på 4 pixlar, vägen returneras som en lista positioner."""
+    step = 4
+    start = (v.px, v.py)
+    prev = {start: None}
+    queue = [start]
+    goal = None
+    i = 0
+    while i < len(queue):
+        x, y = queue[i]
+        i += 1
+        if y <= 120 and free(x, y - 1):
+            goal = (x, y)
+            break
+        for nx, ny in ((x, max(120, y - step)), (max(24, x - step), y),
+                       (min(320, x + step), y), (x, min(222, y + step))):
+            if (nx, ny) not in prev and free(nx, ny):
+                prev[(nx, ny)] = (x, y)
+                queue.append((nx, ny))
+    if goal is None:
+        return []
+    path = []
+    node = goal
+    while node != start:
+        path.append(node)
+        node = prev[node]
+    path.reverse()
+    # dela upp i steg om 1 pixel (spelaren går 1 pixel per bildruta och axel)
+    fine, (x, y) = [], start
+    for nx, ny in path:
+        while (x, y) != (nx, ny):
+            x += (nx > x) - (nx < x)
+            y += (ny > y) - (ny < y)
+            fine.append((x, y))
+    return fine
+
+
+def emu_reader(c):
+    def get(name, n):
+        a = addr(c, name)
+        return bytes(c.ram[a:a + n])
+    return get
+
+
+def test_level3(shots=None):
+    """Nivå 3: övergången från nivå 2, hoppet, vågorna och nivå 4."""
+    c = emu.load(PRG, SYM)
+    for _ in range(20):
+        c.run_frame()
+    c.ram[addr(c, 'debugLevel')] = 2
+    c.joy = 16
+    c.run_frame()
+    c.joy = 0
+    for _ in range(3):
+        c.run_frame()
+    assert peek(c, 'level') == 2 and peek(c, 'tdOn') == 0, "nivå 2 startade inte"
+    # hoppa till slutet av flygfasen på nivå 2
+    c.ram[addr(c, 'phase')] = 2
+    c.ram[addr(c, 'wave')] = 3
+    c.ram[addr(c, 'waveCol')] = 159
+    for f in range(600):
+        c.ram[addr(c, 'lives')] = 3
+        c.ram[addr(c, 'invuln')] = 10
+        c.run_frame()
+        if peek(c, 'tdOn'):
+            break
+    assert peek(c, 'tdOn') == 1 and peek(c, 'level') == 3, "nivå 3 startade inte efter nivå 2"
+    print("nivå 3: startade efter %d bildrutor (PREPARE TO JUMP)" % f)
+    c.frame_busy.clear()
+
+    # fallskärmshoppet: gubben sjunker, åtta sprites (4 kupol, 3 lager, skugga)
+    ys = []
+    for f in range(400):
+        c.joy = 8 if 30 < f < 50 else 0
+        c.run_frame()
+        if peek(c, 'tdState') == 0 and (ys or peek(c, 'py') < 110):   # efter tdStart
+            ys.append(peek(c, 'py'))
+            if len(ys) == 20:
+                assert c.io[0x15] == 0xff, "fallskärmen ska använda alla 8 sprites"
+                assert c.io[0x1c] == 0x80, "fallskärm och gubbe ska vara hires, skuggan multicolor"
+                if shots:
+                    c.render(os.path.join(shots, 'niva3_fallskarm.png'))
+        if peek(c, 'tdState') == 2:
+            break
+    assert peek(c, 'tdState') == 2, "landade aldrig"
+    assert ys == sorted(ys) and ys[-1] - ys[0] > 60, "gubben sjunker inte"
+    print("nivå 3: landade efter %d bildrutor" % f)
+
+    # spela: banan scrollar, vågorna byts, STAGE CLEAR, nivå 4
+    seen = set()
+    wrow0, stuck, last_wrow = peek(c, 'tdWrow'), 0, None
+    for f in range(9000):
+        v = TdView(emu_reader(c))
+        c.joy = td_bot(v, f)
+        c.ram[addr(c, 'lives')] = 3
+        c.run_frame()
+        st = (peek(c, 'level'), peek(c, 'tdOn'), peek(c, 'wave'), peek(c, 'tdState'))
+        if st not in seen:
+            print("bildruta %5d: nivå %d, ovanifrån %d, våg %d, läge %d" % ((f,) + st))
+            seen.add(st)
+        if peek(c, 'tdOn') and peek(c, 'tdState') == 2:
+            # HUD-raden 25 rader/yscroll 3, spelplanen 24 rader/yscroll = tdFine
+            d011_hud = c.line_regs[52][0]
+            d011_play = c.line_regs[100][0]
+            assert d011_hud == 0x1b, "HUD-radens $d011: %02x" % d011_hud
+            assert d011_play & 0x18 == 0x10, "spelplanens $d011: %02x" % d011_play
+            w = peek(c, 'tdWrow')
+            stuck = stuck + 1 if w == last_wrow else 0
+            last_wrow = w
+            if stuck >= 600 and shots:
+                c.render(os.path.join(shots, 'niva3_fast.png'))
+            assert stuck < 600, "boten har fastnat vid världsrad %d" % w
+            if shots and f == 700:
+                c.render(os.path.join(shots, 'niva3_spel.png'))
+        if peek(c, 'level') == 4 and peek(c, 'tdOn') == 0:
+            break
+    assert peek(c, 'level') == 4 and peek(c, 'tdOn') == 0 and peek(c, 'phase') == 0, \
+        "nivå 4 (springfas) startade inte efter nivå 3"
+    assert {s[2] for s in seen if s[1]} == {0, 1, 2, 3}, "alla vågor på nivå 3 nåddes inte"
+    busy = max(c.frame_busy[2:])
+    print("nivå 3: klar efter %d bildrutor, mest CPU-tid %d cykler (%.0f%%)" % (
+        f, busy, 100.0 * busy / FRAME_CYCLES))
+    assert busy < FRAME_CYCLES, "en bildruta tog för lång tid"
+
+
 def main():
     shots = None
     if '--shots' in sys.argv:
@@ -81,6 +279,10 @@ def main():
                         os.path.join(ROOT, 'src', 'main.asm'), '-o', PRG, '--sym', SYM])
     if r.returncode:
         sys.exit("Bygget misslyckades")
+    if '--level3' in sys.argv:
+        test_level3(shots)
+        print("OK")
+        return
 
     c = emu.load(PRG, SYM)
     for _ in range(30):
@@ -228,6 +430,8 @@ def main():
     name = bytes(c.ram[addr(c, 'hsName') + pos * 3: addr(c, 'hsName') + pos * 3 + 3])
     assert name == b'\x01\x01\x01', "namnet sparades inte: %r" % name
     print("topplistan: plats %d, namn AAA" % (pos + 1))
+
+    test_level3(shots)
     print("OK")
 
 

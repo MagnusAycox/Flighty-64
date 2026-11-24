@@ -21,6 +21,10 @@ irq:
     bne irqTop
 
     // ---- nederkant
+    lda #$1b                // HUD: 25 rader, yscroll 3
+    sta $d011
+    lda #COL_BLACK
+    sta $d021
     lda hudD016
     sta $d016
     inc frameFlag
@@ -32,7 +36,10 @@ irq:
 
     // ---- överkant (före första grottraden)
 irqTop:
-    lda nextD018
+    lda tdOn                // nivå 3: vertikal finscroll först
+    beq !+
+    jsr tdRasterTop
+!:  lda nextD018
     sta $d018
     lda nextD016
     sta $d016
@@ -98,4 +105,14 @@ applyFrame:
     sta $d010
     lda sprEnable
     sta $d015
+    lda sprMC
+    sta $d01c
+    lda sprXexp
+    sta $d01d
+    lda sprYexp
+    sta $d017
+    lda sprPrio
+    sta $d01b
+    lda pendingD011
+    sta nextD011
     rts
