@@ -379,6 +379,34 @@ def run_level3(a, g, mon, frame, snap, joy):
             break
     assert g.peek('tdState') == 2, "landade aldrig"
     print("nivå 3: landade")
+
+    # multiplexern: 12 objekt på olika höjder (som test_mux i smoke_test)
+    def place():
+        for i in range(5):
+            for name, val in (('E_TYPE', 1), ('E_XL', 40 + i * 50), ('E_XH', 0),
+                              ('E_Y', 70 + i * 30), ('E_ST', 1), ('E_TM', 200), ('E_POSE', 0)):
+                g.poke(name, val, i)
+        for i in range(4):
+            for name, val in (('EB_ON', 1), ('EB_XL', 60 + i * 60), ('EB_XH', 0),
+                              ('EB_Y', 75 + i * 35), ('EB_DX', 0), ('EB_DY', 0)):
+                g.poke(name, val, i)
+        for i in range(2):
+            x = 250 + i * 40
+            for name, val in (('FX_T', 24), ('FX_XL', x & 255), ('FX_XH', x >> 8),
+                              ('FX_Y', 90 + i * 70)):
+                g.poke(name, val, i)
+        g.poke('tdSpawnT', 200)
+    for _ in range(3):
+        place()
+        g.poke('invuln', 10)
+        step()
+    snap('lv3_mux.png')
+    print("nivå 3: multiplexern, %d sprites, %d via raster-avbrott" % (
+        g.peek('vsN'), g.peek('mpN')))
+    for i in range(5):
+        g.poke('E_TYPE', 0, i)
+    for i in range(4):
+        g.poke('EB_ON', 0, i)
     seen = set()
     for f in range(a.frames):
         joy[0] = td_bot(TdView(get), f)
@@ -394,6 +422,11 @@ def run_level3(a, g, mon, frame, snap, joy):
                     step()
                 snap('lv3_vag%d.png' % (st[2] + 1))
             if st[1] and st[3] == 3:
+                for _ in range(40):
+                    joy[0] = td_bot(TdView(get), f)
+                    step()
+                snap('lv3_port.png')
+            if st[1] and st[3] == 4:
                 snap('lv3_clear.png')
         if st[0] == 4 and st[1] == 0:
             break

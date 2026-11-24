@@ -12,7 +12,7 @@ genom en slingrande grotta där monstren både springer på marken och flyger i
 luften. Efter flygturen landar skeppet och nästa nivå börjar, med fler monster.
 
 Var tredje nivå är annorlunda: du hoppar ut med **fallskärm** och kämpar dig
-fram över en bana som ses **ovanifrån** (se [nivå 3](#nivå-3-banan-ovanifrån-under-arbete)).
+fram över en bana som ses **ovanifrån** (se [nivå 3](#nivå-3-banan-ovanifrån)).
 
 ![Startskärmens logo](docs/logo.gif)
 
@@ -129,10 +129,11 @@ Efter flygfasens fjärde våg visas "PREPARE TO LAND". Under tiden marken
 planar ut kan du flyga fritt utan att krocka med grottan. Sedan landar
 autopiloten skeppet, du kliver ut och nästa nivå börjar.
 
-### Nivå 3: banan ovanifrån (under arbete)
+### Nivå 3: banan ovanifrån
 
 ![Fallskärmshoppet i VICE](docs/niva3/vice_fallskarm.png)
 ![Banan ovanifrån i VICE](docs/niva3/vice_vag3.png)
+![Porten i VICE](docs/niva3/vice_port.png)
 
 Nivå 3, 6, 9 och så vidare är en egen sorts nivå som ses ovanifrån.
 
@@ -144,11 +145,29 @@ Nivå 3, 6, 9 och så vidare är en egen sorts nivå som ses ovanifrån.
   går aldrig bakåt. Det finns alltid en väg igenom.
 * **Skjuta:** upp, vänster, höger eller snett upp åt vänster/höger, beroende
   på joysticken. Utan riktning går skottet uppåt.
-* Nivån har 4 vågor. Efter våg 4 kommer "STAGE CLEAR" och nästa nivå.
+* **Granat:** håll in fire och dra joysticken **nedåt**. Granaten kastas
+  rakt uppåt, flyger i en båge (skuggan visar var den är) och smäller en bit
+  framför dig. Alla soldater nära smällen dör. Antalet granater står uppe
+  till höger (GRENADE).
+* **Lådor** ligger på marken från våg 2. Gå på en låda så får du 4 granater
+  (högst 9).
+* **Soldaterna** kommer uppifrån, går en bit nedåt, stannar och skjuter och
+  går sedan vidare. De går runt träd och sandsäckar.
 
-Det som finns nu är **steg 1** av planen: hoppet, banan, gubben och skotten.
-Fiender, granater och lådor, taggtråd och porten som ska sprängas kommer i
-nästa steg. Så här är det tänkt att se ut (mockups med spelets grafik):
+| Våg | Vad som händer                                               |
+|-----|--------------------------------------------------------------|
+| 1   | Soldaterna skjuter rakt nedåt                                |
+| 2   | De skjuter också snett nedåt mot dig. Lådor med granater     |
+| 3   | De kastar också handgranater mot där du står                 |
+| 4   | Taggtråd: hela rader med taggtråd och bara en öppning. Rör du tråden dör du |
+
+Efter våg 4 kommer en **mur med en port**. Banan slutar rulla och det står
+"BLOW UP THE GATE!". Soldaterna kommer ut genom porten. Kasta granater mot
+porten: tre träffar spränger den. Har du inga granater dyker en ny låda upp
+efter några sekunder. När porten sprängs dör alla soldater, du får bonus och
+nästa nivå börjar efter "STAGE CLEAR".
+
+Så här såg planen ut (mockups med spelets grafik):
 
 ![Mockups av nivå 3](docs/niva3/oversikt.png)
 
@@ -163,6 +182,9 @@ nästa steg. Så här är det tänkt att se ut (mockups med spelets grafik):
 | Fladdermus                  | 40    |
 | Sökmina                     | 50    |
 | Kliva in i rymdskeppet      | 100   |
+| Nivå 3: varje rad du tar dig fram | 1 |
+| Nivå 3: soldat              | 100   |
+| Nivå 3: spränga porten      | 500 + 100 per granat kvar |
 
 Du har **3 liv**. När du dör blinkar du en stund och kan då inte skadas av
 monster (i flygfasen inte heller av grottväggarna). När liven är slut kommer
@@ -231,6 +253,8 @@ src/
   menu.asm        Huvudmeny med topplista, "GAME OVER"
   logo.asm        Startskärmens logo med studsande svensk flagga
   topdown.asm     Nivå 3: banan ovanifrån, fallskärmshoppet, vertikal scroll
+  tdobjects.asm   Nivå 3: soldater, skott, granater, lådor, taggtråd och porten
+  mux.asm         Nivå 3: sprite-multiplexer (upp till 16 sprites)
   highscore.asm   Topplistan och namninmatning
   gfx_const.asm   (genererad) spritepekare, teckenkoder, kollisionsboxar
   gfx_data.asm    (genererad) tecken- och spritedata
@@ -241,7 +265,7 @@ tools/
   ka_subset.py    Liten assembler för den KickAss-syntax spelet använder (test)
   emu.py          Minimal C64-testmiljö (py65) för provkörning och skärmbilder
   smoke_test.py   Automatiskt test: meny -> nivå 1 (alla vågor) -> nivå 2 -> game over -> topplista,
-                  sedan nivå 3 (hopp, alla vågor, nivå 4). --level3 kör bara nivå 3
+                  sedan nivå 3 (hopp, multiplexer, alla vågor, porten, nivå 4). --level3 kör bara nivå 3
   vice_test.py    Samma genomspelning i riktiga VICE via den binära monitorn
   get_openroms.sh Hämtar fria C64-ROM:ar (MEGA65 Open ROMs) för VICE-testet
 build.sh          Bygger med KickAssembler
@@ -276,6 +300,8 @@ räknas ut automatiskt från bilderna.
 | `$bfff`       | Byte som VIC visar mellan rader ("tomgång"), alltid 0      |
 | `$c000-$c1ff` | Ringbuffert för grottan, monster, skott, ljud, logons färger (körtid) |
 | `$c200-$cbff` | Nivå 3: banan, 64 rader x 40 tecken (ringbuffert)          |
+| `$cc00-$ccff` | Nivå 3: multiplexerns tabeller                             |
+| `$cd00-$cd8f` | Nivå 3: soldater, fiendeskott, explosioner                 |
 
 Grafiken ligger i VIC-bank 2 (`$dd00`). Programfilen blir då sammanhängande
 utan tomrum, och koden har plats ända upp till `$7fff`. BASIC- och KERNAL-ROM
@@ -323,6 +349,28 @@ avbrottsvektorer på `$fffa-$ffff`.
 * Fallskärmen är fyra vita hires-sprites (48x42 pixlar) och gubben i selen
   tre hires-sprites med en färg var på samma koordinater (svart, ljusröd,
   cyan). Tillsammans med skuggan används alla åtta sprites.
+* Allt på marken (soldater, skott, granater, explosioner) har
+  skärmkoordinater och flyttas en pixel nedåt varje gång banan scrollar.
+  Hindren och taggtråden läses direkt ur ringbufferten, och när en låda
+  plockas upp eller porten skadas skrivs nya block både i ringbufferten och
+  i de två skärmbuffertarna.
+
+### Nivå 3: sprite-multiplexer
+
+Spelaren, 5 soldater, 4 fiendeskott, spelarens skott, två granater med
+skuggor och explosioner blir fler än åtta sprites. Varje bildruta läggs alla
+i en lista med "virtuella" sprites (högst 16):
+
+* Listan sorteras uppifrån och ned (insättningssortering, oftast redan nästan
+  sorterad).
+* De åtta översta skrivs till VIC i vblank som vanligt.
+* Nummer 9 och uppåt återanvänder hårdvarusprite *n* & 7. Ett raster-avbrott
+  på linjen efter att den förra spriten i samma hårdvarusprite har ritats
+  klart skriver om x, y, pekare (i båda skärmbuffertarna), färg, multicolor-
+  och x-bit. Ligger spriten närmare än 24 linjer under den förra visas den
+  inte den bildrutan.
+* Schemat byggs i huvudloopen och kopieras i vblank till tabellerna som
+  avbrotten läser, så att avbrotten aldrig ser ett halvfärdigt schema.
 
 ### Startskärmens logo
 
@@ -399,6 +447,8 @@ bildruta, så varje omgång blir olika beroende på när man trycker fire.
 | 0      | Gubben / rymdskeppet (startskärmen: flaggans lodräta balk) |
 | 1-2    | Spelarens skott                |
 | 3-7    | Monster (max 5), rymdskeppet på marken, explosioner |
+
+På nivå 3 fördelas sprites av multiplexern (se ovan).
 
 Alla sprites är multicolor (delade färger: vit och ljusröd).
 

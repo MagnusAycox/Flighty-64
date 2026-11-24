@@ -18,7 +18,12 @@ irq:
     lda #$ff
     sta $d019               // kvittera
     lda irqStage
+    beq !bottom+
+    cmp #2
     bne irqTop
+    jsr muxIrq              // nivå 3: återanvänd en hårdvarusprite
+    jmp irqExit
+!bottom:
 
     // ---- nederkant
     lda #$1b                // HUD: 25 rader, yscroll 3
@@ -46,6 +51,10 @@ irqTop:
     lda logoOn
     beq !+
     jsr logoRaster
+!:  lda tdOn                // nivå 3: multiplexerns avbrott
+    beq !+
+    jsr muxStart
+    jmp irqExit
 !:  lda #IRQ_LINE_BOTTOM
     sta $d012
     lda #0
@@ -115,4 +124,7 @@ applyFrame:
     sta $d01b
     lda pendingD011
     sta nextD011
-    rts
+    lda tdOn
+    beq !+
+    jmp tdMuxActivate
+!:  rts

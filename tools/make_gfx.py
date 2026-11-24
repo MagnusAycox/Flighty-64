@@ -332,7 +332,8 @@ SPRITES = SPRITES[:3] + _mirrored + SPRITES[3:]
 
 # Nivå 3: multicolor-sprites (gfx_level3.SPR) under nya namn
 for _src, _dst in (('PLAYER_UP', 'TD_PLAYER0'), ('PLAYER_UP2', 'TD_PLAYER1'),
-                   ('ENEMY_DOWN', 'TD_ENEMY0'), ('ENEMY_THROW', 'TD_ENEMYT'),
+                   ('ENEMY_DOWN', 'TD_ENEMY0'), ('ENEMY_DOWN2', 'TD_ENEMY1'),
+                   ('ENEMY_THROW', 'TD_ENEMYT'), ('GSHADOW', 'TD_GSHADOW'),
                    ('SHADOW', 'TD_SHADOW'), ('GRENADE', 'TD_GRENADE'),
                    ('EBULLET', 'TD_EBULLET')):
     SPRITES.append((_dst, "top", L3.SPR[_src]))

@@ -176,20 +176,20 @@ readJoy:
     rts
 
 // -------------------------------------------------------------------
-// 8-bitars slumptal från en 16-bitars Galois-LFSR. Bevarar X och Y.
+// 8-bitars slumptal (16-bitars xorshift). Bevarar X och Y.
 // -------------------------------------------------------------------
-rnd:
-    lda #8
-    sta rndCnt
+rnd:                        // xorshift16 (7, 9, 8), ca 35 cykler
+    lda rngHi
+    lsr
     lda rngLo
-!loop:
-    asl
-    rol rngHi
-    bcc !+
-    eor #$39
-!:  dec rndCnt
-    bne !loop-
+    ror
+    eor rngHi
+    sta rngHi
+    ror
+    eor rngLo
     sta rngLo
+    eor rngHi
+    sta rngHi
     rts
 
 // -------------------------------------------------------------------
@@ -478,6 +478,8 @@ beginCave:
 #import "logo.asm"
 #import "highscore.asm"
 #import "topdown.asm"
+#import "tdobjects.asm"
+#import "mux.asm"
 
 // Grafikdata (genererad av tools/make_gfx.py)
 #import "gfx_data.asm"

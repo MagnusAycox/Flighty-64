@@ -107,6 +107,9 @@ tdStart:
 
     lda #TD_CR
     jsr clearGameScreens
+    jsr tdObjectsInit
+    lda #22                 // skärm A visar världsrad 22 överst
+    sta bufTop
 
     // generatorn: öppen mark där fallskärmen landar
     lda #10
@@ -211,17 +214,31 @@ tdUpdate:
 !:  cmp #TDS_LAND
     bne !+
     jmp tdLand
-!:  cmp #TDS_PLAY
-    bne !clear+
+!:  cmp #TDS_CLEAR
+    beq !clear+
+    lda pState              // spelar (eller vid porten)
+    beq !alive+
+    jsr tdDying
+    jmp !objects+
+!alive:
     jsr tdPlayer
+    jsr tdCrateCheck
+    lda invuln
+    bne !+
+    jsr tdOnWire            // taggtråd!
+    bcc !+
+    jsr tdKillPlayer
+!:  jsr tdThrowCheck
     jsr tdFire
-    jmp tdBullets
+!objects:
+    jsr tdBullets
+    jmp tdObjectsUpdate
 !clear:
     jsr tdBullets
+    jsr tdObjectsUpdate
     dec tdTimer
     bne !rts+
-    // (porten kommer i ett senare steg) - vidare till nästa nivå
-    lda level
+    lda level               // vidare till nästa nivå
     cmp #99
     bcs !+
     inc level
@@ -313,6 +330,8 @@ tdPlayer:
     cmp #TD_SCROLL_Y
     bcs !noU+
     inc py                  // högt upp: banan scrollar i stället
+    jsr tdCanScroll
+    bcs !noU+               // (muren är framme)
     jsr tdScroll
     jmp !noU+
 !undoU:
@@ -321,6 +340,9 @@ tdPlayer:
     lda joy
     and #JOY_DOWN
     beq !noD+
+    lda joy                 // fire + ned = granat, gubben står kvar
+    and #JOY_FIRE
+    bne !noD+
     lda py
     cmp #TD_MAX_Y
     bcs !noD+
@@ -407,6 +429,7 @@ tdCharAt:
     clc
     adc #1
 !row:
+    sta tdLastRow
     and #63
     tay
     lda ringLo,y
@@ -431,11 +454,13 @@ tdCharAt:
     bcc !ok+
     lda #39
 !ok:
+    sta tdLastCol
     tay
     lda (tdPtr),y
     rts
 !left:
     ldy #0
+    sty tdLastCol
     lda (tdPtr),y
     rts
 
@@ -443,6 +468,7 @@ tdCharAt:
 // tdScroll: banan rör sig en pixel nedåt
 // -------------------------------------------------------------------
 tdScroll:
+    jsr tdShiftObjects
     inc tdFine
     lda tdFine
     cmp #8
@@ -490,17 +516,12 @@ tdRowPassed:
     jsr tdSetDensity
     jmp showWaveMsg
 !clear:
-    lda #NUM_WAVES-1
+    lda #NUM_WAVES-1        // sista vågen klar: muren med porten byggs
     sta wave
-    lda #TDS_CLEAR          // (porten kommer i ett senare steg)
-    sta tdState
-    lda #200
-    sta tdTimer
-    lda #SFX_PICKUP
-    jsr playSfx
-    lda #<msgClear
-    ldx #>msgClear
-    jmp showMsg
+    lda tdGateGen
+    bne !rts+
+    lda #1
+    sta tdGateGen
 !rts:
     rts
 
@@ -588,7 +609,10 @@ tdNewMetaRow:
 !:  rts
 
 !normal:
-    jsr rnd                 // stigen vandrar
+    lda tdGateGen           // muren med porten
+    beq !+
+    jmp tdGateMetaRow
+!:  jsr rnd                 // stigen vandrar
     and #3
     beq !left+
     cmp #1
@@ -631,6 +655,129 @@ tdNewMetaRow:
     sta TD_META,x
     dex
     bpl !col-
+
+    lda tdCrateCool         // lådor (från våg 2) och taggtråd (våg 4)
+    beq !+
+    dec tdCrateCool
+!:  lda tdWireCool
+    beq !+
+    dec tdWireCool
+!:  lda wave
+    beq !done+
+    lda tdCrateCool
+    bne !wire+
+    jsr rnd
+    cmp #20
+    bcs !wire+
+    jsr rnd
+    and #3
+    clc
+    adc tdPath
+    sec
+    sbc #1
+    tax
+    lda #MT_CRATE
+    sta TD_META,x
+    lda #14
+    sta tdCrateCool
+!wire:
+    lda wave
+    cmp #3
+    bcc !done+
+    lda tdWireCool
+    bne !done+
+    jsr rnd
+    cmp #80
+    bcs !done+
+    lda #3
+    sta tdWireCool
+    ldx #19                 // stängsel överallt utom på stigen
+!col:
+    txa
+    sec
+    sbc tdPath
+    clc
+    adc #2
+    cmp #5
+    bcc !+
+    lda #MT_WIRE
+    sta TD_META,x
+!:  dex
+    bpl !col-
+    ldx #0                  // sista blocket i varje stängsel: stolpe till höger
+!col:
+    lda TD_META,x
+    cmp #MT_WIRE
+    bne !next+
+    cpx #19
+    beq !end+
+    lda TD_META+1,x
+    cmp #MT_WIRE
+    beq !next+
+!end:
+    lda #MT_WIRE_END
+    sta TD_META,x
+!next:
+    inx
+    cpx #20
+    bne !col-
+!done:
+    rts
+
+// Muren: låda + gräs, sedan murens nedre rad (med porten), övre rad,
+// och sedan bara mur
+tdGateMetaRow:
+    lda tdGateGen
+    cmp #4
+    bcs !wall+
+    ldx #19                 // gräs (första raden med en låda på stigen)
+!loop:
+    jsr rnd
+    and #1
+    sta TD_META,x
+    dex
+    bpl !loop-
+    lda tdGateGen
+    cmp #1
+    bne !+
+    ldx tdPath
+    lda #MT_CRATE
+    sta TD_META,x
+!:  inc tdGateGen
+    rts
+!wall:
+    ldx #19
+    lda tdGateGen
+    cmp #4
+    bne !top+
+    lda #MT_WALL_B
+!loop:
+    sta TD_META,x
+    dex
+    bpl !loop-
+    lda #MT_GATE_BL
+    sta TD_META+9
+    lda #MT_GATE_BR
+    sta TD_META+10
+    lda tdGenRow            // portens nedersta världsrad
+    sta tdGateRow
+    inc tdGateGen
+    rts
+!top:
+    lda #MT_WALL
+!loop:
+    sta TD_META,x
+    dex
+    bpl !loop-
+    lda tdGateGen
+    cmp #5
+    bne !rts+
+    lda #MT_GATE_TL
+    sta TD_META+9
+    lda #MT_GATE_TR
+    sta TD_META+10
+    inc tdGateGen
+!rts:
     rts
 
 // tdCopyRingRow: A = världsrad, scrPtr = skärmrad (40 tecken)
@@ -661,6 +808,16 @@ tdCopyStep:
     rts
 !:  cmp #2
     bne !second+
+    ldx dispBuf             // den dolda bufferten visar en rad längre fram
+    lda bufTop,x
+    clc
+    adc #1
+    pha
+    txa
+    eor #1
+    tax
+    pla
+    sta bufTop,x
     dec needCopy
     lda dispBuf
     bne !fromB+
@@ -856,8 +1013,7 @@ tdBullets:
 // -------------------------------------------------------------------
 tdBuildSprites:
     lda #0
-    sta sprEnable
-    sta sprMsb
+    sta vsN
     sta sprXexp
     sta sprYexp
     sta sprPrio
@@ -866,41 +1022,21 @@ tdBuildSprites:
     bcc !chute+
     jmp !ground+
 
-    // ---- fallskärmen: gubben = 3 hires-lager (sprite 0-2),
-    //      kupolen = 4 hires-sprites (3-6), skuggan = sprite 7
+    // ---- fallskärmen: kupolen = 4 hires-sprites, gubben = 3 hires-lager
+    //      på samma koordinater, skuggan. Sorteras uppifrån av multiplexern.
 !chute:
-    ldx #2
-!loop:
-    lda px
-    sta sprX,x
-    lda py
-    sta sprY,x
-    lda jumperPtr,x
-    sta sprPtr,x
-    lda jumperCol,x
-    sta sprCol,x
-    dex
-    bpl !loop-
-    lda tdState             // efter landningen: gubben på marken
-    cmp #TDS_LAND
-    bne !+
-    lda px
-    sta sprX
-    lda py
-    sta sprY
-    lda #SPR_TD_PLAYER0
-    sta sprPtr
-    lda #COL_CYAN
-    sta sprCol
-!:  ldx #3
+    lda #0
+    sta vsTXH
+    sta vsTM
+    ldx #0
 !loop:
     lda px                  // kupolen: x-12 / x+12, y-41 / y-20
     clc
-    adc canopyDX-3,x
-    sta sprX,x
+    adc canopyDX,x
+    sta vsTX
     lda py
     clc
-    adc canopyDY-3,x
+    adc canopyDY,x
     sta tmp0
     lda tdState             // landat: kupolen sjunker ihop
     cmp #TDS_LAND
@@ -913,55 +1049,90 @@ tdBuildSprites:
     adc tmp0
     sta tmp0
 !:  lda tmp0
-    sta sprY,x
-    lda canopyPtr-3,x
-    sta sprPtr,x
+    sta vsTY
+    lda canopyPtr,x
+    sta vsTP
     lda #COL_WHITE
-    sta sprCol,x
+    sta vsTC
+    jsr vsPush
     inx
-    cpx #7
+    cpx #4
     bne !loop-
-    lda #TD_LAND_Y          // skuggan: under gubben, närmar sig när han sjunker
+    lda px
+    sta vsTX
+    lda py
+    sta vsTY
+    lda tdState
+    cmp #TDS_LAND
+    beq !landed+
+    ldx #0                  // gubben i selen
+!loop:
+    lda jumperPtr,x
+    sta vsTP
+    lda jumperCol,x
+    sta vsTC
+    jsr vsPush
+    inx
+    cpx #3
+    bne !loop-
+    lda #TD_LAND_Y          // skuggan: närmar sig gubben när han sjunker
     sec
     sbc py
     lsr
     clc
     adc px
-    sta sprX+7
+    sta vsTX
     lda #TD_LAND_Y+14
-    sta sprY+7
+    sta vsTY
     lda #SPR_TD_SHADOW
-    sta sprPtr+7
+    sta vsTP
     lda #COL_BLACK
-    sta sprCol+7
-    lda tdState
-    cmp #TDS_LAND
-    beq !landed+
-    lda #%11111111
-    sta sprEnable
-    lda #%10000000          // bara skuggan är multicolor
-    sta sprMC
-    rts
-!landed:
-    lda #%01111001          // gubbe + kupol (utan skugga och selens lager)
-    sta sprEnable
-    lda #%00000001
-    sta sprMC
-    rts
-
-    // ---- på marken: gubben (multicolor) + skotten
-!ground:
-    lda #$ff
-    sta sprMC
-    lda px
-    sta sprX
-    lda pxHi
-    beq !+
+    sta vsTC
     lda #1
-    sta sprMsb
-!:  lda py
-    sta sprY
-    lda joy                 // gångbilder när han rör sig
+    sta vsTM
+    jsr vsPush
+    jmp tdMuxPrepare
+!landed:
+    lda #SPR_TD_PLAYER0
+    sta vsTP
+    lda #COL_CYAN
+    sta vsTC
+    lda #1
+    sta vsTM
+    jsr vsPush
+    jmp tdMuxPrepare
+
+    // ---- på marken
+!ground:
+    lda px
+    sta vsTX
+    lda pxHi
+    sta vsTXH
+    lda py
+    sta vsTY
+    lda #1
+    sta vsTM
+    lda pState
+    beq !alive+
+    lda #COL_YELLOW         // explosion
+    sta vsTC
+    lda frameCount
+    lsr
+    lsr
+    lsr
+    and #1
+    clc
+    adc #SPR_BOOM0
+    sta vsTP
+    jsr vsPush
+    jmp !rest+
+!alive:
+    lda invuln              // blinkar när han inte kan skadas
+    beq !+
+    lda frameCount
+    and #4
+    bne !rest+
+!:  lda joy                 // gångbilder när han rör sig
     and #JOY_UP+JOY_DOWN+JOY_LEFT+JOY_RIGHT
     beq !+
     lda frameCount
@@ -971,43 +1142,13 @@ tdBuildSprites:
     and #1
 !:  clc
     adc #SPR_TD_PLAYER0
-    sta sprPtr
+    sta vsTP
     lda #COL_CYAN
-    sta sprCol
-    lda invuln
-    beq !show+
-    lda frameCount
-    and #4
-    bne !bul+
-!show:
-    lda #1
-    sta sprEnable
-!bul:
-    ldx #0
-!loop:
-    lda B_ON,x
-    beq !next+
-    lda B_XLO,x
-    sta sprX+1,x
-    lda B_Y,x
-    sta sprY+1,x
-    lda #SPR_BULLET
-    sta sprPtr+1,x
-    lda #COL_YELLOW
-    sta sprCol+1,x
-    lda bitTab+1,x
-    ora sprEnable
-    sta sprEnable
-    lda B_XHI,x
-    beq !next+
-    lda bitTab+1,x
-    ora sprMsb
-    sta sprMsb
-!next:
-    inx
-    cpx #NUM_BUL
-    bne !loop-
-    rts
+    sta vsTC
+    jsr vsPush
+!rest:
+    jsr tdPushObjects
+    jmp tdMuxPrepare
 
 jumperPtr:  .byte SPR_JUMPER_K, SPR_JUMPER_S, SPR_JUMPER_C
 jumperCol:  .byte COL_BLACK, COL_LIGHT_RED, COL_CYAN

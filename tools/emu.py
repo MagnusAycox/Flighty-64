@@ -81,6 +81,7 @@ class C64:
         self.raster_cmp = 0
         self.joy = 0          # bitar: 1 upp 2 ned 4 vänster 8 höger 16 fire
         self.line_regs = [None] * LINES
+        self.line_spr = [None] * LINES
         self.frame = 0
         self.mpu = MPU(memory=self, pc=syms['labels']['start'])
         self.mpu.sp = 0xff
@@ -178,6 +179,8 @@ class C64:
         self.line_regs[self.line] = (self.io[0x11], self.io[0x16], self.io[0x18],
                                      self.io[0x20], self.io[0x21], self.io[0x22], self.io[0x23])
         self.bank = (3 - (self.io[0xd00] & 3)) * 0x4000
+        scr = self.bank + ((self.io[0x18] >> 4) & 15) * 0x400 + 0x3f8
+        self.line_spr[self.line] = (bytes(self.io[0:0x2f]), bytes(self.ram[scr:scr + 8]))
 
     def run_frame(self):
         target = (self.frame + 1) * LINES * CYCLES_PER_LINE
@@ -299,6 +302,25 @@ class C64:
                     vcbase = vc + 40
                 else:
                     rc += 1
+        # spritelogik: en sprite startar linjen efter att Y matchat
+        # rasterlinjen och visar sedan 21 (42) linjer oavsett nya Y.
+        spr_rows = [[None] * 8 for _ in range(LINES)]
+        cnt = [None] * 8
+        for line in range(LINES):
+            prev = self.line_spr[(line - 1) % LINES]
+            cur = self.line_spr[line]
+            for n in range(8):
+                if cnt[n] is not None:
+                    cnt[n] += 1
+                    yx = cur and cur[0][0x17] & (1 << n)
+                    if cnt[n] >= (42 if yx else 21):
+                        cnt[n] = None
+                if cnt[n] is None and prev and prev[0][0x15] & (1 << n) \
+                        and prev[0][1 + 2 * n] == (line - 1) & 0xff and line > 0:
+                    cnt[n] = 0
+                if cnt[n] is not None and cur and cur[0][0x15] & (1 << n):
+                    yx = cur[0][0x17] & (1 << n)
+                    spr_rows[line][n] = cnt[n] >> 1 if yx else cnt[n]
         for y in range(H):
             line = y + top_line
             regs = self.line_regs[line % LINES] or default
@@ -348,33 +370,29 @@ class C64:
                     if bits & (0x80 >> cx):
                         px[ix, y] = PALETTE[color]
                         fg.add(ix)
-            # sprites
-            en = self.io[0x15]
+            # sprites (registren som de var på varje linje, så att
+            # multiplexade sprites syns som på riktigt)
             for n in range(7, -1, -1):
-                if not en & (1 << n):
+                st = spr_rows[line % LINES][n]
+                if st is None:
                     continue
-                sy = self.io[1 + n * 2] + 1    # VIC visar spriten från linjen efter y
-                dy = line - sy
-                yexp = self.io[0x17] & (1 << n)
-                if yexp:
-                    dy >>= 1
-                if not (0 <= dy < 21) or line < sy:
-                    continue
-                behind = self.io[0x1b] & (1 << n)
-                xexp = 2 if self.io[0x1d] & (1 << n) else 1
-                sxp = self.io[n * 2] | (0x100 if self.io[0x10] & (1 << n) else 0)
-                ptr = self.ram[screen + 0x3f8 + n]
+                sregs, sptrs = self.line_spr[line % LINES] or (bytes(0x2f), bytes(8))
+                dy = st
+                behind = sregs[0x1b] & (1 << n)
+                xexp = 2 if sregs[0x1d] & (1 << n) else 1
+                sxp = sregs[n * 2] | (0x100 if sregs[0x10] & (1 << n) else 0)
+                ptr = sptrs[n]
                 base = bank + ptr * 64 + dy * 3
                 b = (self.ram[base] << 16) | (self.ram[base + 1] << 8) | self.ram[base + 2]
-                colr = self.io[0x27 + n] & 15
-                smc = self.io[0x1c] & (1 << n)
+                colr = sregs[0x27 + n] & 15
+                smc = sregs[0x1c] & (1 << n)
                 for k in range(24 * xexp):
                     i = k // xexp
                     if smc:
                         pair = (b >> (22 - (i & ~1))) & 3
                         if not pair:
                             continue
-                        c = [0, self.io[0x25], colr, self.io[0x26]][pair]
+                        c = [0, sregs[0x25], colr, sregs[0x26]][pair]
                     else:
                         if not (b >> (23 - i)) & 1:
                             continue

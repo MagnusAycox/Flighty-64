@@ -7,13 +7,15 @@ Automatiskt röktest för Flighty 64 (utan KickAssembler/VICE).
    meny (logo-effekten) -> springfas (4 vågor) -> rymdskepp -> flygfas (4 vågor)
    -> landning -> nivå 2 -> game over -> topplista
    och sedan nivå 3 (banan ovanifrån): slutet av nivå 2 -> "PREPARE TO
-   JUMP" -> fallskärmshopp -> 4 vågor -> STAGE CLEAR -> nivå 4
+   JUMP" -> fallskärmshopp -> multiplexer -> 4 vågor -> porten sprängs ->
+   STAGE CLEAR -> nivå 4
 3. Kontrollerar att inget kraschar, att alla faser och alla monstertyper
    dyker upp och att en bildruta aldrig tar mer CPU-tid än vad som finns.
 
 Kör:  python3 tools/smoke_test.py [--shots katalog] [--level3]
       (--level3: bara testet av nivå 3)
 """
+import copy
 import os
 import subprocess
 import sys
@@ -85,7 +87,10 @@ class TdView:
         self.py = get('py', 1)[0]
         self.fine = get('tdFine', 1)[0]
         self.wrow = get('tdWrow', 1)[0]
-        self.ring = get('MAP_RING', 64 * 40) if st == 2 else None
+        self.ring = get('MAP_RING', 64 * 40) if st in (2, 3) else None
+        self.gren = get('tdGren', 1)[0]
+        self.gate_y = get('tdGateY', 1)[0]
+        self.pg_on = get('pgOn', 1)[0]
 
     def char_at(self, x, y):
         """Samma uträkning som tdCharAt i topdown.asm."""
@@ -96,7 +101,11 @@ class TdView:
         return self.ring[(row & 63) * 40 + col]
 
     def solid(self, x, y):
-        return self.char_at(x, y) >= 192
+        c = self.char_at(x, y)
+        return c >= 192 or 112 <= c < 120      # hinder eller taggtråd
+
+    def crate(self, x, y):
+        return 108 <= self.char_at(x + 11, y + 10) < 112   # som tdCrateCheck
 
 
 TD_BOX = ((6, 4), (17, 4), (6, 16), (17, 16))     # samma hörn som tdBlocked
@@ -107,9 +116,10 @@ _td_plan = {'path': [], 'key': None, 'idle': 0}
 
 def td_bot(v, f):
     """Nivå 3: hitta en väg (bredden först, rutnät på 4 pixlar) från gubben
-    till överkanten av spelplanen där banan kan scrolla vidare, och följ den
-    tills den är gången (eller banan har scrollat)."""
-    if v.state != 2:
+    till ett mål och följ den. Målet är överkanten av spelplanen där banan
+    kan scrolla vidare - eller vid porten: en plats under porten där en
+    granat (fire + ned) når fram, eller en låda med granater."""
+    if v.state not in (2, 3):
         return 0
     j = 16 if f % 10 < 2 else 0
     plan = _td_plan
@@ -117,18 +127,35 @@ def td_bot(v, f):
     def free(x, y):
         return not any(v.solid(x + a, y + b) for a, b in TD_BOX)
 
-    key = (v.wrow, v.fine)
+    if v.state == 2:
+        def goal(x, y):
+            return y <= 120 and free(x, y - 1)
+        mode = 'scroll'
+    elif v.gren:
+        gy = min(v.gate_y + 70, 200)
+
+        def goal(x, y):
+            return 156 <= x <= 186 and gy - 24 <= y <= gy
+        mode = 'gate'
+    else:
+        goal = v.crate
+        mode = 'crate'
+    key = (mode, v.wrow, v.fine)
     if plan['key'] != key or not plan['path'] or plan['idle'] > 8:
         plan['key'] = key
         plan['idle'] = 0
-        plan['path'] = td_find_path(v, free)
+        plan['path'] = td_find_path(v, free, goal)
     path = plan['path']
     while path and path[0] == (v.px, v.py):
         path.pop(0)
         plan['idle'] = 0
+    if mode == 'gate' and goal(v.px, v.py):
+        return 0 if v.pg_on or f % 4 else 16 | 2      # kasta granat
     if not path:
-        if v.py <= 120 and free(v.px, v.py - 1):
+        if mode == 'scroll' and v.py <= 120 and free(v.px, v.py - 1):
             return j | 1        # vid överkanten: uppåt (banan scrollar)
+        if mode != 'scroll':
+            return j
         return j | 2            # ingen väg syns: backa
     nx, ny = path[0]
     plan['idle'] += 1
@@ -138,35 +165,35 @@ def td_bot(v, f):
         j |= 8
     if ny < v.py:
         j |= 1
-    elif ny > v.py:
-        j |= 2
+    elif ny > v.py and not j & 16:
+        j |= 2                  # (fire + ned är granatkast)
     return j
 
 
-def td_find_path(v, free):
-    """Bredden först från gubben till en plats vid överkanten där han kan gå
-    uppåt. Rutnät på 4 pixlar, vägen returneras som en lista positioner."""
+def td_find_path(v, free, goal):
+    """Bredden först från gubben till en position där goal(x, y) är sant.
+    Rutnät på 4 pixlar, vägen returneras som en lista positioner."""
     step = 4
     start = (v.px, v.py)
     prev = {start: None}
     queue = [start]
-    goal = None
+    found = None
     i = 0
     while i < len(queue):
         x, y = queue[i]
         i += 1
-        if y <= 120 and free(x, y - 1):
-            goal = (x, y)
+        if goal(x, y):
+            found = (x, y)
             break
         for nx, ny in ((x, max(120, y - step)), (max(24, x - step), y),
                        (min(320, x + step), y), (x, min(222, y + step))):
             if (nx, ny) not in prev and free(nx, ny):
                 prev[(nx, ny)] = (x, y)
                 queue.append((nx, ny))
-    if goal is None:
+    if found is None:
         return []
     path = []
-    node = goal
+    node = found
     while node != start:
         path.append(node)
         node = prev[node]
@@ -231,11 +258,15 @@ def test_level3(shots=None):
     assert peek(c, 'tdState') == 2, "landade aldrig"
     assert ys == sorted(ys) and ys[-1] - ys[0] > 60, "gubben sjunker inte"
     print("nivå 3: landade efter %d bildrutor" % f)
+    test_mux(copy.deepcopy(c), shots)
 
     # spela: banan scrollar, vågorna byts, STAGE CLEAR, nivå 4
     seen = set()
     wrow0, stuck, last_wrow = peek(c, 'tdWrow'), 0, None
+    max_gren = gate_frames = kills = deaths = 0
+    score = lambda: int(bytes(c.ram[addr(c, 'score'):addr(c, 'score') + 3]).hex())
     for f in range(9000):
+        pstate, s0 = peek(c, 'pState'), score()
         v = TdView(emu_reader(c))
         c.joy = td_bot(v, f)
         c.ram[addr(c, 'lives')] = 3
@@ -244,6 +275,14 @@ def test_level3(shots=None):
         if st not in seen:
             print("bildruta %5d: nivå %d, ovanifrån %d, våg %d, läge %d" % ((f,) + st))
             seen.add(st)
+            if shots and st[1] and st[3] in (3, 4):
+                c.render(os.path.join(shots, 'niva3_port%d.png' % st[3]))
+        max_gren = max(max_gren, peek(c, 'tdGren'))
+        kills += score() - s0 >= 100          # en soldat = 100 poäng
+        deaths += peek(c, 'pState') != 0 and pstate == 0
+        if peek(c, 'tdOn') and peek(c, 'tdState') == 3:
+            gate_frames += 1
+            assert gate_frames < 3000, "porten sprängdes aldrig"
         if peek(c, 'tdOn') and peek(c, 'tdState') == 2:
             # HUD-raden 25 rader/yscroll 3, spelplanen 24 rader/yscroll = tdFine
             d011_hud = c.line_regs[52][0]
@@ -263,10 +302,53 @@ def test_level3(shots=None):
     assert peek(c, 'level') == 4 and peek(c, 'tdOn') == 0 and peek(c, 'phase') == 0, \
         "nivå 4 (springfas) startade inte efter nivå 3"
     assert {s[2] for s in seen if s[1]} == {0, 1, 2, 3}, "alla vågor på nivå 3 nåddes inte"
+    assert any(s[3] == 3 for s in seen) and any(s[3] == 4 for s in seen), "porten nåddes/sprängdes inte"
+    assert max_gren > 0, "boten fick aldrig några granater"
+    assert kills > 0, "inga soldater sköts"
+    print("nivå 3: %d soldater skjutna, boten dog %d gånger, porten sprängd efter %d bildrutor" % (
+        kills, deaths, gate_frames))
     busy = max(c.frame_busy[2:])
     print("nivå 3: klar efter %d bildrutor, mest CPU-tid %d cykler (%.0f%%)" % (
         f, busy, 100.0 * busy / FRAME_CYCLES))
     assert busy < FRAME_CYCLES, "en bildruta tog för lång tid"
+
+
+def test_mux(c, shots=None):
+    """Multiplexern: 12 objekt på olika höjder ska alla synas, de 4 sista
+    via raster-avbrott som återanvänder hårdvarusprite 0-3."""
+    def place():
+        for i in range(5):                      # soldater (står still)
+            for name, val in (('E_TYPE', 1), ('E_XL', 40 + i * 50), ('E_XH', 0),
+                              ('E_Y', 70 + i * 30), ('E_ST', 1), ('E_TM', 200), ('E_POSE', 0)):
+                c.ram[addr(c, name) + i] = val
+        for i in range(4):                      # fiendeskott (står still)
+            for name, val in (('EB_ON', 1), ('EB_XL', 60 + i * 60), ('EB_XH', 0),
+                              ('EB_Y', 75 + i * 35), ('EB_DX', 0), ('EB_DY', 0)):
+                c.ram[addr(c, name) + i] = val
+        for i in range(2):                      # explosioner
+            x = 250 + i * 40
+            for name, val in (('FX_T', 24), ('FX_XL', x & 255), ('FX_XH', x >> 8),
+                              ('FX_Y', 90 + i * 70)):
+                c.ram[addr(c, name) + i] = val
+        c.ram[addr(c, 'tdSpawnT')] = 200
+    c.joy = 0
+    for _ in range(3):
+        place()
+        c.run_frame()
+    c.run_frame()
+    vs, mp = peek(c, 'vsN'), peek(c, 'mpN')
+    assert vs == 12 and mp == 4, "multiplexern: %d sprites, %d i schemat" % (vs, mp)
+    # varje schemalagd sprite ska ha sina register i VIC:en när den visas
+    for k in range(mp):
+        hw, y = peek(c, 'MP_HW', k), peek(c, 'MP_Y', k)
+        regs, ptrs = c.line_spr[y + 1]
+        # (pekaren kan skilja en bild: explosionerna animeras)
+        assert regs[1 + 2 * hw] == y and regs[2 * hw] == peek(c, 'MP_X', k) \
+            and abs(ptrs[hw] - peek(c, 'MP_P', k)) <= 1, \
+            "multiplexad sprite %d (hårdvara %d, y %d) visas inte rätt" % (k, hw, y)
+    if shots:
+        c.render(os.path.join(shots, 'niva3_mux.png'))
+    print("nivå 3: multiplexern visar %d sprites, %d av dem via raster-avbrott" % (vs, mp))
 
 
 def main():

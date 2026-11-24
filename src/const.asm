@@ -156,7 +156,8 @@
 .const TDS_INTRO    = 0           // fallskärmshoppet
 .const TDS_LAND     = 1           // landat, fallskärmen faller ihop
 .const TDS_PLAY     = 2
-.const TDS_CLEAR    = 3           // nivån klar (tills porten finns)
+.const TDS_GATE     = 3           // muren är framme: spräng porten
+.const TDS_CLEAR    = 4           // porten sprängd
 
 // -------------------------------------------------------------------
 // Zero page
@@ -290,6 +291,64 @@
 .const tdDens      = $af          // hur tätt hindren står (0-255)
 .const tdIntroRows = $b0          // blockrader kvar av öppen mark
 .const tdPtr       = $b1          // 2 byte
+// multiplexern (mux.asm)
+.const vsN         = $b3          // antal virtuella sprites denna bildruta
+.const mpN         = $b4          // schemalagda (bortom de 8 första)
+.const maN         = $b5          // ... aktiva i avbrotten
+.const maI         = $b6
+.const bufTop      = $b7          // 2 byte: världsrad på skärmrad 2 i buffert A/B
+.const mxSaveX     = $b9
+.const mxKey       = $ba
+.const mxKeyY      = $bb
+.const mxJ         = $bc
+.const mxHw        = $bd
+.const vsTX        = $be          // vsPush: x (lo)
+.const vsTXH       = $bf          //         x (hi)
+.const vsTY        = $c0
+.const vsTP        = $c1
+.const vsTC        = $c2
+.const vsTM        = $c3
+// nivå 3: granater, fiender, port (tdobjects.asm)
+.const pgOn        = $c4          // spelarens granat i luften
+.const pgXL        = $c5
+.const pgXH        = $c6
+.const pgY         = $c7
+.const pgT         = $c8
+.const egOn        = $c9          // fiendens granat i luften
+.const egXL        = $ca
+.const egXH        = $cb
+.const egY         = $cc
+.const egTXL       = $cd          // mål
+.const egTXH       = $ce
+.const egTY        = $cf
+.const egT         = $d0
+.const tdSpawnT    = $d1
+.const tdGateRow   = $d2          // världsrad för murens nederkant
+.const tdGateGen   = $d3          // 0 = ingen mur än, 1-5 = muren byggs, 6 = klar
+.const tdGateHP    = $d4
+.const tdCrateCool = $d5
+.const tdWireCool  = $d6
+.const tdCrateT    = $d7
+.const maxE        = $d8
+.const tdGateY     = $d9          // sprite-y för portens nederkant
+.const throwCool   = $da
+.const tdLastRow   = $db          // tdCharAt: världsrad och kolumn för senaste tecknet
+.const tdLastCol   = $dc
+.const tsRow       = $dd          // tdSetChar: världsrad och kolumn
+.const tsCol       = $de
+.const tbAX        = $df          // 2 byte: boxtest (tdBoxHit)
+.const tbAY        = $e1
+.const tbAW        = $e2
+.const tbAH        = $e3
+.const tbBX        = $e4          // 2 byte
+.const tbBY        = $e6
+.const tbBW        = $e7
+.const tbBH        = $e8
+.const tdTX        = $e9          // provposition för soldat (tdEnemyTry)
+.const tdTXH       = $ea
+.const tdTY        = $eb
+.const tmp6        = $ec
+.const tmp7        = $ed
 .const LOGO_LINES  = $c180        // 27 byte: $d021 per rasterlinje, linje 58-84
 .const LOGO_D016   = $c1a0        // 27 byte: $d016 per rasterlinje, linje 58-84
 .const sprX        = $68          // 8 byte

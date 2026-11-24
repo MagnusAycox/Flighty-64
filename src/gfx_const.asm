@@ -27,17 +27,19 @@
 .const SPR_TD_PLAYER0 = 151
 .const SPR_TD_PLAYER1 = 152
 .const SPR_TD_ENEMY0 = 153
-.const SPR_TD_ENEMYT = 154
-.const SPR_TD_SHADOW = 155
-.const SPR_TD_GRENADE = 156
-.const SPR_TD_EBULLET = 157
-.const SPR_CANOPY_TL = 158   // hires
-.const SPR_CANOPY_TR = 159   // hires
-.const SPR_CANOPY_BL = 160   // hires
-.const SPR_CANOPY_BR = 161   // hires
-.const SPR_JUMPER_K = 162   // hires
-.const SPR_JUMPER_S = 163   // hires
-.const SPR_JUMPER_C = 164   // hires
+.const SPR_TD_ENEMY1 = 154
+.const SPR_TD_ENEMYT = 155
+.const SPR_TD_GSHADOW = 156
+.const SPR_TD_SHADOW = 157
+.const SPR_TD_GRENADE = 158
+.const SPR_TD_EBULLET = 159
+.const SPR_CANOPY_TL = 160   // hires
+.const SPR_CANOPY_TR = 161   // hires
+.const SPR_CANOPY_BL = 162   // hires
+.const SPR_CANOPY_BR = 163   // hires
+.const SPR_JUMPER_K = 164   // hires
+.const SPR_JUMPER_S = 165   // hires
+.const SPR_JUMPER_C = 166   // hires
 
 .const CH_ROCK0    = 64
 .const CH_ROCK1    = 65
@@ -51,7 +53,7 @@
 
 .const GFX_CHARS_LEN   = 72
 .const BOUNCE_LEN      = 139   // bildrutor i flaggans studsserie
-.const GFX_SPRITES_LEN = 2368
+.const GFX_SPRITES_LEN = 2496
 
 // Nivå 3: block (metatiles) och teckenkoder
 .const MT_GRASS0    = 0   // '.', tecken 88-91
